@@ -86,7 +86,7 @@ const fmt = s => new Date(s).toLocaleDateString('ja-JP', { month: 'numeric', day
 async function load() {
   const [a, b, c] = await Promise.all([
     sb.from('subjects').select('*').order('name'),
-    sb.from('tips').select('*, profiles(display_name)').order('created_at', { ascending: false }),
+    sb.from('tips').select('*, profiles!author_id(display_name)').order('created_at', { ascending: false }),
     sb.from('tip_confirmations').select('*')
   ]);
   const err = a.error || b.error || c.error;
