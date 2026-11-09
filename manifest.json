@@ -1,0 +1,10 @@
+{
+  "name": "でるとこ",
+  "short_name": "でるとこ",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F2F5F7",
+  "theme_color": "#14232E",
+  "lang": "ja"
+}
