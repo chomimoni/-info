@@ -44,6 +44,17 @@ main{max-width:1000px;margin:0 auto;padding:10px 16px 100px;animation:up .25s ea
 .hero .big b{font-size:68px;color:var(--hl);margin:0 4px}
 .hero .nm{font-weight:700;font-size:17px;margin:2px 0 14px}
 .hero svg{opacity:.35;flex:none}
+.hero .when{font-size:15px;font-weight:700;opacity:.9}
+.hchips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 2px}
+.hchips a{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border-radius:20px;background:#fff;color:var(--ink);font-weight:900;text-decoration:none;border-left:6px solid var(--ac)}
+.hero .more{color:#fff;font-size:13px;opacity:.85;margin-top:6px}
+.dg{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+h2+.dg{border-top:0}
+.dg .dt{flex:none;font-weight:900;line-height:1.3}.dg .dt small{display:block;color:var(--blue);font-weight:900}
+.dg .cs{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+.dg .cs a{text-decoration:none;font-weight:700}
+.gh{display:flex;justify-content:space-between;align-items:baseline;margin:18px 0 8px;font-weight:900}
+.gh span:last-child{color:var(--blue)}.gh.off span:last-child{color:var(--sub);font-weight:500}
 .pill{display:inline-block;border:1.5px solid #fff;border-radius:22px;padding:6px 16px;font-weight:700;font-size:14px}
 .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
 .tiles a{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 4px;background:var(--card);border-radius:16px;box-shadow:var(--sh);color:var(--ink);text-decoration:none;font-weight:700;font-size:13px}
@@ -137,6 +148,9 @@ function daysLeft(d) {
   return Math.round((new Date(d + 'T00:00:00') - t) / 864e5);
 }
 const ac = id => `hsl(${(id * 67) % 360} 55% 42%)`;
+const per = s => s.exam_period ? `${s.exam_period}限 ` : '';
+const perOpts = v => '<option value="">時限なし</option>' + [1, 2, 3, 4].map(n => `<option value="${n}" ${+v === n ? 'selected' : ''}>${n}限</option>`).join('');
+const byPer = (a, b) => (a.exam_period || 99) - (b.exam_period || 99);
 const fmt = s => new Date(s).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
 
 async function load() {
@@ -247,10 +261,14 @@ function authView() {
 
 function homeView() {
   const subs = st.subjects.map(s => ({ ...s, d: daysLeft(s.exam_date) }));
-  const up = subs.filter(s => s.d !== null && s.d >= 0).sort((a, b) => a.d - b.d);
-  const f = up[0];
+  const up = subs.filter(s => s.d !== null && s.d >= 0).sort((a, b) => a.d - b.d || byPer(a, b));
+  const days = [];
+  up.forEach(s => { const g = days.find(x => x.date === s.exam_date); g ? g.list.push(s) : days.push({ date: s.exam_date, d: s.d, list: [s] }); });
+  const f = days[0];
   const hero = f
-    ? `<a class="hero" href="#/s/${f.id}"><div><div class="big">${f.d === 0 ? '<b>今日</b>' : `あと<b>${f.d}</b>日`}</div><div class="nm">${esc(f.name)}の試験</div><span class="pill">詳細を見る ›</span></div>${svg('cal', 110)}</a>`
+    ? `<div class="hero"><div><div class="when">${md(f.date)}${f.list.length > 1 ? `　${f.list.length}科目` : ''}</div><div class="big">${f.d === 0 ? '<b>今日</b>' : `あと<b>${f.d}</b>日`}</div>
+      <div class="hchips">${f.list.map(s => `<a href="#/s/${s.id}" style="--ac:${ac(s.id)}">${per(s)}${esc(s.name)}</a>`).join('')}</div>
+      ${days[1] ? `<div class="more">次は ${md(days[1].date)}（あと${days[1].d}日）${days[1].list.map(s => per(s) + esc(s.name)).join('・')}</div>` : ''}</div>${svg('cal', 110)}</div>`
     : `<a class="hero" href="#/subjects"><div><div class="nm">まず科目と試験日を登録しよう</div><span class="pill">科目を追加 ›</span></div>${svg('cal', 110)}</a>`;
   const tile = (h, i, t, c) => `<a href="${h}" class="${c || ''}">${svg(i, 26)}<span>${t}</span></a>`;
   const pop = st.subjects.map(s => ({ s, n: st.tips.filter(t => t.subject_id === s.id).length })).sort((a, b) => b.n - a.n).slice(0, 3);
@@ -258,17 +276,27 @@ function homeView() {
   ${hero}
   <div class="tiles">${tile('#/write', 'pen', '投稿する')}${tile('#/subjects', 'list', 'テスト一覧')}${tile('#/search', 'search', '検索する')}${tile('#/fav', 'star', 'お気に入り', 'y')}</div>
   <div class="cols"><section class="card2"><h2>最新の投稿</h2>${st.tips.slice(0, 4).map(item).join('') || '<p class="empty">まだ投稿がありません。「投稿する」から最初の1件を書いてみましょう。</p>'}</section>
-  <div><section class="card2"><h2>今後のテスト</h2>${up.slice(0, 3).map(s => `<a class="up" href="#/s/${s.id}" style="--ac:${ac(s.id)}"><span>${md(s.exam_date)}</span><span class="chipc">${esc(s.name)}</span></a>`).join('') || '<p class="empty">試験日がまだありません。</p>'}</section>
+  <div><section class="card2"><h2>今後のテスト</h2>${days.slice(0, 4).map(g => `<div class="dg"><span class="dt">${md(g.date)}<small>${g.d === 0 ? '今日' : `あと${g.d}日`}</small></span><span class="cs">${g.list.map(s => `<a class="chipc" href="#/s/${s.id}" style="--ac:${ac(s.id)}">${per(s)}${esc(s.name)}</a>`).join('')}</span></div>`).join('') || '<p class="empty">試験日がまだありません。</p>'}${days.length > 4 ? '<a class="up" href="#/subjects" style="justify-content:center;color:var(--blue)">すべて見る ›</a>' : ''}</section>
   <section class="card2"><h2>人気の科目</h2>${pop.map((p, k) => `<a class="up" href="#/s/${p.s.id}"><span>${k + 1}　${esc(p.s.name)}</span><span class="sub">${p.n}件</span></a>`).join('') || '<p class="empty">科目がまだありません。</p>'}</section></div></div>`);
 }
 
 function subjectsView() {
   const key = s => s.d === null ? 1e6 : s.d < 0 ? 5e5 - s.d : s.d;
-  const subs = st.subjects.map(s => ({ ...s, d: daysLeft(s.exam_date) })).sort((a, b) => key(a) - key(b));
+  const subs = st.subjects.map(s => ({ ...s, d: daysLeft(s.exam_date) })).sort((a, b) => key(a) - key(b) || byPer(a, b));
   const lab = s => s.d === null ? '試験日未設定' : s.d < 0 ? '終了' : s.d === 0 ? '今日' : `あと${s.d}日`;
-  shell(`<h1>テスト一覧</h1>${subs.map(s => `<a class="row" style="--ac:${ac(s.id)}" href="#/s/${s.id}"><span>${esc(s.name)}</span><span class="d ${s.d === null || s.d < 0 ? 'off' : ''}">${lab(s)}</span></a>`).join('')}
+  const groups = [];
+  subs.forEach(s => {
+    const k = s.d === null ? 'none' : s.d < 0 ? 'past' : s.exam_date;
+    const g = groups.find(x => x.k === k);
+    g ? g.list.push(s) : groups.push({ k, s, list: [s] });
+  });
+  const head = g => g.k === 'none' ? '<div class="gh off"><span>試験日未設定</span><span></span></div>'
+    : g.k === 'past' ? '<div class="gh off"><span>終了した試験</span><span></span></div>'
+    : `<div class="gh"><span>${md(g.s.exam_date)}${g.list.length > 1 ? `　${g.list.length}科目` : ''}</span><span>${lab(g.s)}</span></div>`;
+  const row = s => `<a class="row" style="--ac:${ac(s.id)}" href="#/s/${s.id}"><span>${s.exam_period && s.d !== null && s.d >= 0 ? `<span class="tag">${s.exam_period}限</span>` : ''}${esc(s.name)}</span><span class="d off">${s.d !== null && s.d < 0 ? md(s.exam_date) : '›'}</span></a>`;
+  shell(`<h1>テスト一覧</h1>${groups.map(g => head(g) + g.list.map(row).join('')).join('')}
   <details ${subs.length ? '' : 'open'}><summary>科目を追加する</summary><form id="addSubject"><label for="sn">科目名</label><input id="sn" name="name" required>
-  <label for="sd">試験日（あとから変更できます）</label><input id="sd" name="exam_date" type="date"><div style="margin-top:14px"><button class="btn">追加する</button></div></form></details>`);
+  <label for="sd">試験日（あとから変更できます）</label><input id="sd" name="exam_date" type="date"><label for="sp">時限（任意）</label><select id="sp" name="exam_period">${perOpts("")}</select><div style="margin-top:14px"><button class="btn">追加する</button></div></form></details>`);
 }
 
 function writeView() {
@@ -339,9 +367,11 @@ function subjectView(id) {
   if (sortBy === 'conf') list.sort((a, b) => cnt(b) - cnt(a));
   const d = daysLeft(s.exam_date);
   const dl = d === null ? '試験日未設定' : d < 0 ? '試験は終了しました' : d === 0 ? '試験は今日です' : `試験まであと${d}日`;
+  const dlp = d !== null && d >= 0 && s.exam_period ? `（${s.exam_period}限）` : '';
   const opts = ['先生の発言', '資料', '過去問', 'その他'].map(o => `<option ${o === lastSource ? 'selected' : ''}>${o}</option>`).join('');
-  shell(`<h1>${esc(s.name)}</h1><p class="sub">${dl}</p>
+  shell(`<h1>${esc(s.name)}</h1><p class="sub">${dl}${dlp}</p>
   <label for="examDate">試験日</label><input id="examDate" type="date" value="${s.exam_date || ''}" data-sid="${s.id}">
+  <label for="examPer">時限</label><select id="examPer" data-sid="${s.id}">${perOpts(s.exam_period)}</select>
   ${canDel ? `<div style="margin-top:10px"><button class="chip" data-act="delsub" data-id="${s.id}">この科目を削除</button></div>` : ''}
   <h2>でるところを書く</h2>
   <form id="addTip" class="card"><input type="hidden" name="sid" value="${s.id}">
@@ -548,7 +578,7 @@ app.addEventListener('submit', async e => {
     }
     if (f.id === 'homeSearch') { searchQ = d.q || ''; location.hash = '#/search'; return; }
     if (f.id === 'addSubject') {
-      const r = await sb.from('subjects').insert({ name: d.name.trim(), exam_date: d.exam_date || null });
+      const r = await sb.from('subjects').insert({ name: d.name.trim(), exam_date: d.exam_date || null, exam_period: d.exam_period ? +d.exam_period : null });
       if (r.error) throw r.error;
     } else if (f.id === 'addTip') {
       const image_path = await upImg(d.img);
@@ -562,9 +592,10 @@ app.addEventListener('submit', async e => {
 });
 
 app.addEventListener('change', async e => {
-  if (e.target.id !== 'examDate') return;
+  if (e.target.id !== 'examDate' && e.target.id !== 'examPer') return;
   try {
-    const r = await sb.from('subjects').update({ exam_date: e.target.value || null }).eq('id', +e.target.dataset.sid);
+    const v = e.target.value || null;
+    const r = await sb.from('subjects').update(e.target.id === 'examDate' ? { exam_date: v } : { exam_period: v ? +v : null }).eq('id', +e.target.dataset.sid);
     if (r.error) throw r.error;
     await load(); route();
   } catch (err) { toast(err.message); }
