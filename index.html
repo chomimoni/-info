@@ -3,10 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>でるとこ</title>
+<title>ヤマはる</title>
 <link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="でるとこ">
+<meta name="apple-mobile-web-app-title" content="ヤマはる">
 <meta name="theme-color" content="#14232E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -52,6 +54,17 @@ textarea{min-height:84px}
 .auth h1{font-size:40px;font-weight:900;margin-bottom:4px}
 .link{background:none;border:0;color:var(--teal);font-weight:700;text-decoration:underline;margin-top:12px;cursor:pointer;min-height:44px}
 #toast{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));background:var(--red);color:#fff;border-radius:10px;padding:12px 14px;font-weight:700;display:none;z-index:9}
+.logo{font-size:20px;font-weight:900;letter-spacing:.02em;background:linear-gradient(transparent 62%,var(--hl) 62%,var(--hl) 88%,transparent 88%);padding:0 4px;color:#fff}
+.row{border-left:6px solid var(--ac,var(--line))}
+.row:active,.tip:active{transform:scale(.99)}
+.tip{box-shadow:0 1px 0 rgba(20,35,46,.04);border-left:5px solid var(--ac,var(--line))}
+.tip.fix{border-left-color:var(--red)}
+.hero{background:linear-gradient(160deg,#1c3446,var(--ink))}
+.hero .big{font-size:64px}
+.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));min-height:52px;padding:0 20px;border:0;border-radius:26px;background:var(--hl);color:var(--ink);font-weight:900;box-shadow:0 4px 14px rgba(20,35,46,.28);cursor:pointer;z-index:4}
+@keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+main{animation:up .25s ease-out}
+@media (prefers-reduced-motion:reduce){main{animation:none}.row:active,.tip:active{transform:none}}
 :focus-visible{outline:3px solid var(--teal);outline-offset:2px}
 </style>
 </head>
@@ -81,6 +94,7 @@ function daysLeft(d) {
   const t = new Date(); t.setHours(0, 0, 0, 0);
   return Math.round((new Date(d + 'T00:00:00') - t) / 864e5);
 }
+const ac = id => `hsl(${(id * 67) % 360} 55% 42%)`;
 const fmt = s => new Date(s).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
 
 async function load() {
@@ -113,13 +127,13 @@ function route() {
 window.addEventListener('hashchange', () => { unitF = ''; route(); });
 
 function shell(inner, back) {
-  app.innerHTML = `<header>${back ? '<a href="#/">← 科目一覧</a>' : '<strong>でるとこ</strong>'}<button data-act="out">ログアウト</button></header><main>${inner}</main>`;
+  app.innerHTML = `<header>${back ? '<a href="#/">← 科目一覧</a>' : '<strong class="logo">ヤマはる</strong>'}<button data-act="out">ログアウト</button></header><main>${inner}</main>`;
   window.scrollTo(0, 0);
 }
 
 function authView() {
   const reg = authMode === 'reg';
-  app.innerHTML = `<div class="auth"><h1>でるとこ</h1><p class="sub">クラスの試験情報をみんなで集める場所</p>
+  app.innerHTML = `<div class="auth"><h1><span class="logo" style="color:var(--ink);font-size:40px">ヤマはる</span></h1><p class="sub">クラスの試験情報をみんなで集める場所</p>
   <form id="auth" class="card">
     <label for="uid">ユーザーID（半角英数字）</label><input id="uid" name="uid" autocomplete="username" autocapitalize="none" required>
     ${reg ? '<label for="nm">表示名（掲示板に出る名前）</label><input id="nm" name="name" required>' : ''}
@@ -136,11 +150,11 @@ function homeView() {
   const none = subs.filter(s => s.d === null);
   const past = subs.filter(s => s.d !== null && s.d < 0);
   const lab = s => s.d === null ? '<span class="d off">試験日未設定</span>' : s.d < 0 ? '<span class="d off">終了</span>' : `<span class="d">あと${s.d}日</span>`;
-  const row = s => `<a class="row" href="#/s/${s.id}"><span>${esc(s.name)}</span>${lab(s)}</a>`;
+  const row = s => `<a class="row" style="--ac:${ac(s.id)}" href="#/s/${s.id}"><span>${esc(s.name)}</span>${lab(s)}</a>`;
   const first = up[0];
   const hero = first ? `<a class="hero" href="#/s/${first.id}"><div class="big">${first.d === 0 ? '今日' : 'あと' + first.d + '日'}</div><div class="nm">${esc(first.name)}の試験</div></a>` : '';
   const subName = id => (st.subjects.find(s => s.id === id) || {}).name || '';
-  const recent = st.tips.slice(0, 5).map(t => `<article class="tip"><p class="body"><mark>${esc(t.body)}</mark></p><p class="meta"><a href="#/s/${t.subject_id}">${esc(subName(t.subject_id))}</a><span>${esc(t.profiles?.display_name)}</span><span>${fmt(t.created_at)}</span></p></article>`).join('');
+  const recent = st.tips.slice(0, 5).map(t => `<article class="tip" style="--ac:${ac(t.subject_id)}"><p class="body"><mark>${esc(t.body)}</mark></p><p class="meta"><a href="#/s/${t.subject_id}">${esc(subName(t.subject_id))}</a><span>${esc(t.profiles?.display_name)}</span><span>${fmt(t.created_at)}</span></p></article>`).join('');
   shell(`${hero}${up.slice(1).concat(none, past).map(row).join('')}
   ${subs.length ? '' : '<p class="empty">まず科目を追加しましょう。例：解剖生理II</p>'}
   <details ${subs.length ? '' : 'open'}><summary>科目を追加する</summary>
@@ -154,7 +168,7 @@ function tipHTML(t) {
   const n = st.conf.filter(c => c.tip_id === t.id).length;
   const mine = st.conf.some(c => c.tip_id === t.id && c.user_id === me.id);
   const can = t.author_id === me.id || me.is_admin;
-  return `<article class="tip ${t.needs_correction ? 'fix' : ''}">
+  return `<article class="tip ${t.needs_correction ? 'fix' : ''}" style="--ac:${ac(t.subject_id)}">
     ${t.needs_correction ? '<p class="flag">訂正あり：範囲が変わった可能性があります</p>' : ''}
     <p class="body"><mark>${esc(t.body)}</mark></p>
     <p class="meta"><span>${esc(t.source)}</span>${t.unit ? `<span>${esc(t.unit)}</span>` : ''}<span>${esc(t.profiles?.display_name)}</span><span>${fmt(t.created_at)}</span></p>
@@ -193,7 +207,9 @@ function subjectView(id) {
     ${units.map(u => `<button class="chip ${unitF === u ? 'on' : ''}" data-act="unit" data-u="${esc(u)}">${esc(u)}</button>`).join('')}
     <button class="chip" data-act="sort">${sortBy === 'conf' ? '並び：確認が多い順' : '並び：新しい順'}</button>
   </div>
-  ${list.map(tipHTML).join('') || '<p class="empty">まだ投稿がありません。最初の1件を書いてみましょう。</p>'}`, true);
+  ${list.map(tipHTML).join('') || '<p class="empty">まだ投稿がありません。最初の1件を書いてみましょう。</p>'}
+  <button class="fab" data-act="write">＋ 書く</button>`, true);
+  document.querySelector('h1').style.cssText = `border-left:8px solid ${ac(s.id)};padding-left:10px`;
 }
 
 async function doAuth(d) {
@@ -243,6 +259,7 @@ app.addEventListener('click', async e => {
   try {
     if (a === 'mode') { authMode = authMode === 'login' ? 'reg' : 'login'; return route(); }
     if (a === 'out') { await sb.auth.signOut(); me = null; return route(); }
+    if (a === 'write') { const t = document.getElementById('tb'); t.scrollIntoView({ behavior: 'smooth', block: 'center' }); return t.focus({ preventScroll: true }); }
     if (a === 'unit') { unitF = b.dataset.u; return route(); }
     if (a === 'sort') { sortBy = sortBy === 'conf' ? 'new' : 'conf'; return route(); }
     let r;
