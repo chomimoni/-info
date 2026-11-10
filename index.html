@@ -9,63 +9,89 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="ヤマはる">
-<meta name="theme-color" content="#14232E">
+<meta name="theme-color" content="#2F7BF5">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#F2F5F7;--ink:#14232E;--sub:#5B6B77;--line:#D3DCE2;--card:#fff;--hl:#F6D04D;--teal:#0F6E78;--red:#B8381F}
+:root{--bg:#F4F8FE;--ink:#10264F;--sub:#62728F;--line:#DCE6F5;--card:#fff;--hl:#FFD93B;--blue:#2F7BF5;--teal:#2F7BF5;--navy:#0E2A5C;--red:#D8452B;--sh:0 6px 20px rgba(47,123,245,.10)}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:500 16px/1.7 "Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif}
-header{background:var(--ink);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:5}
-header a,header button{color:#fff;background:none;border:0;font:inherit;font-weight:700;text-decoration:none;padding:6px 0;cursor:pointer}
-main{max-width:560px;margin:0 auto;padding:16px 16px calc(40px + env(safe-area-inset-bottom))}
-h1,h2,h3{line-height:1.3;margin:0}
-h2{font-size:18px;font-weight:900;margin:28px 0 10px}
-.hero{display:block;background:var(--ink);color:#fff;border-radius:14px;padding:22px 20px;text-decoration:none;margin-bottom:12px}
-.hero .big{font-size:56px;font-weight:900;line-height:1.1;color:var(--hl)}
-.hero .nm{font-weight:700;margin-top:4px}
-.row{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:8px;color:inherit;text-decoration:none;font-weight:700}
-.row .d{color:var(--teal);font-weight:900}
-.row .d.off{color:var(--sub);font-weight:500}
-.tip{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:10px}
-.tip.fix{border-color:var(--red)}
+h1,h2{line-height:1.3;margin:0}
+h1{font-size:24px;font-weight:900;margin:8px 0 14px}
+h2{font-size:17px;font-weight:900;margin:22px 0 10px}
+.logo{font-size:22px;font-weight:900;color:var(--ink);background:linear-gradient(transparent 62%,var(--hl) 62%,var(--hl) 88%,transparent 88%);padding:0 4px}
+.nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:#fff;border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom));z-index:6}
+.nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:48px;font-size:11px;font-weight:700;color:var(--sub);text-decoration:none;border-radius:12px}
+.nav a.on{color:var(--blue)}
+.brand{display:none}
+.top{display:flex;align-items:center;justify-content:space-between;max-width:1000px;margin:0 auto;padding:calc(12px + env(safe-area-inset-top)) 16px 0}
+.back{color:var(--blue);font-weight:700;text-decoration:none}
+main{max-width:1000px;margin:0 auto;padding:10px 16px 100px;animation:up .25s ease-out}
+@keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){main{animation:none}}
+@media(min-width:900px){
+.nav{top:0;bottom:auto;right:auto;width:210px;height:100vh;flex-direction:column;gap:6px;padding:24px 14px;border:0;background:linear-gradient(180deg,var(--navy),#1B4FB5)}
+.nav a{flex:none;flex-direction:row;justify-content:flex-start;gap:12px;padding:0 14px;min-height:46px;font-size:15px;color:#cfe0ff}
+.nav a.on{background:var(--blue);color:#fff}
+.brand{display:block;margin-bottom:24px}.brand .logo{color:#fff}
+.body{margin-left:210px}.top .mob{display:none}main{padding-bottom:40px}}
+.sbar{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:26px;padding:0 16px;margin-bottom:14px;color:var(--sub)}
+.sbar input,.srch{border:0;outline:0;background:none}
+.srch{width:100%;min-height:48px;border:1px solid var(--line);border-radius:26px;padding:0 18px;background:#fff;margin-bottom:12px}
+.hero{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:24px 22px;border-radius:22px;color:#fff;text-decoration:none;background:linear-gradient(120deg,#2A64E0,#5BA8FF);box-shadow:var(--sh);overflow:hidden}
+.hero .big{font-size:26px;font-weight:900;line-height:1.2}
+.hero .big b{font-size:68px;color:var(--hl);margin:0 4px}
+.hero .nm{font-weight:700;font-size:17px;margin:2px 0 14px}
+.hero svg{opacity:.35;flex:none}
+.pill{display:inline-block;border:1.5px solid #fff;border-radius:22px;padding:6px 16px;font-weight:700;font-size:14px}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
+.tiles a{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 4px;background:var(--card);border-radius:16px;box-shadow:var(--sh);color:var(--ink);text-decoration:none;font-weight:700;font-size:13px}
+.tiles svg{color:var(--blue)}.tiles .y svg{color:#F5B400}
+.cols{display:grid;gap:0}
+@media(min-width:900px){.cols{grid-template-columns:1.6fr 1fr;gap:14px}}
+.card2{background:var(--card);border-radius:18px;box-shadow:var(--sh);padding:6px 16px 10px;margin-bottom:14px}
+.card2 h2{margin:12px 0 6px;border-left:5px solid var(--blue);padding-left:8px}
+.item,.up,.row{display:flex;color:inherit;text-decoration:none}
+.item{gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+h2+.item{border-top:0}
+.ico{flex:none;width:52px;height:52px;border-radius:14px;background:#EAF2FF;color:var(--ac,var(--blue));display:grid;place-items:center}
+.tx{min-width:0}.tx p{margin:2px 0;font-weight:700;line-height:1.5}.tx small{color:var(--sub)}
+.tag{display:inline-block;background:#E4EEFF;color:var(--blue);border-radius:6px;padding:0 8px;font-size:12px;font-weight:700;margin-right:4px}
+.tag.red{background:#FDE6E1;color:var(--red)}
+.up{justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--line);font-weight:900}
+h2+.up{border-top:0}
+.chipc{background:color-mix(in srgb,var(--ac) 16%,#fff);color:var(--ac);border-radius:14px;padding:2px 12px;font-size:13px}
+.row{justify-content:space-between;align-items:center;background:var(--card);border-radius:14px;box-shadow:var(--sh);border-left:6px solid var(--ac,var(--line));padding:14px;margin-bottom:10px;font-weight:700}
+.d{color:var(--blue);font-weight:900}.d.off{color:var(--sub);font-weight:500}
+.tip{background:var(--card);border-radius:16px;box-shadow:var(--sh);border-left:5px solid var(--ac,var(--line));padding:14px;margin-bottom:12px}
+.tip.fix{border-left-color:var(--red)}
 .tip .flag{margin:0 0 6px;color:var(--red);font-weight:700;font-size:14px}
 .tip .body{margin:0 0 8px;font-size:17px}
 mark{background:linear-gradient(transparent 55%,var(--hl) 55%);color:inherit;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 .meta{display:flex;flex-wrap:wrap;gap:2px 12px;color:var(--sub);font-size:13px;margin:0 0 10px}
-.meta a{color:var(--teal)}
+.meta a{color:var(--blue)}
 .acts{display:flex;gap:8px;flex-wrap:wrap}
 button,select,input,textarea{font:inherit}
-.acts button,.chip,.btn{min-height:44px;padding:0 14px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);font-weight:700;cursor:pointer}
-.acts .cf.on{background:var(--teal);border-color:var(--teal);color:#fff}
-.btn{background:var(--ink);border-color:var(--ink);color:#fff;width:100%}
+.acts button,.chip,.btn{min-height:44px;padding:0 14px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font-weight:700;cursor:pointer}
+.acts .cf.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn{background:var(--blue);border-color:var(--blue);color:#fff;width:100%;border-radius:24px}
 .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:6px}
-.chip{white-space:nowrap;min-height:38px}
-.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
-form.card,details{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+.chip{white-space:nowrap;min-height:38px;border-radius:19px}.chip.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+form.card,details{background:var(--card);border-radius:16px;box-shadow:var(--sh);padding:14px;margin-bottom:14px}
 summary{font-weight:700;cursor:pointer;min-height:28px}
 label{display:block;font-size:14px;font-weight:700;margin:10px 0 4px}
-input,select,textarea{width:100%;min-height:44px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+input,select,textarea{width:100%;min-height:44px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+.sbar input{min-height:48px;padding:0}
 textarea{min-height:84px}
-.sub{color:var(--sub);font-size:14px}
-.empty{color:var(--sub);padding:16px 4px}
+.sub{color:var(--sub);font-size:14px}.empty{color:var(--sub);padding:12px 0}
+.fab{position:fixed;right:16px;bottom:calc(76px + env(safe-area-inset-bottom));min-height:52px;padding:0 20px;border:0;border-radius:26px;background:var(--hl);color:var(--ink);font-weight:900;box-shadow:0 4px 14px rgba(16,38,79,.28);cursor:pointer;z-index:4}
+@media(min-width:900px){.fab{bottom:24px}}
 .auth{max-width:420px;margin:0 auto;padding:48px 16px}
-.auth h1{font-size:40px;font-weight:900;margin-bottom:4px}
-.link{background:none;border:0;color:var(--teal);font-weight:700;text-decoration:underline;margin-top:12px;cursor:pointer;min-height:44px}
-#toast{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));background:var(--red);color:#fff;border-radius:10px;padding:12px 14px;font-weight:700;display:none;z-index:9}
-.logo{font-size:20px;font-weight:900;letter-spacing:.02em;background:linear-gradient(transparent 62%,var(--hl) 62%,var(--hl) 88%,transparent 88%);padding:0 4px;color:#fff}
-.row{border-left:6px solid var(--ac,var(--line))}
-.row:active,.tip:active{transform:scale(.99)}
-.tip{box-shadow:0 1px 0 rgba(20,35,46,.04);border-left:5px solid var(--ac,var(--line))}
-.tip.fix{border-left-color:var(--red)}
-.hero{background:linear-gradient(160deg,#1c3446,var(--ink))}
-.hero .big{font-size:64px}
-.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));min-height:52px;padding:0 20px;border:0;border-radius:26px;background:var(--hl);color:var(--ink);font-weight:900;box-shadow:0 4px 14px rgba(20,35,46,.28);cursor:pointer;z-index:4}
-@keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-main{animation:up .25s ease-out}
-@media (prefers-reduced-motion:reduce){main{animation:none}.row:active,.tip:active{transform:none}}
-:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+.auth h1{font-size:40px;margin-bottom:4px}
+.link{background:none;border:0;color:var(--blue);font-weight:700;text-decoration:underline;margin-top:12px;cursor:pointer;min-height:44px}
+#toast{position:fixed;left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));background:var(--red);color:#fff;border-radius:12px;padding:12px 14px;font-weight:700;display:none;z-index:9}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 </style>
 </head>
 <body>
@@ -118,16 +144,38 @@ async function boot() {
   route();
 }
 
+let searchQ = '';
+const IC = {
+  home: '<path d="M3 11l9-8 9 8v10H3z"/>',
+  list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  pen: '<path d="M4 20l4-1 11-11-3-3L5 16z"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
+  star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+  cal: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  chk: '<path d="M5 12l5 5 9-10"/>'
+};
+const svg = (n, s = 22) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n]}</svg>`;
+const NAV = [['#/', 'home', 'ホーム'], ['#/subjects', 'list', 'テスト一覧'], ['#/write', 'pen', '投稿する'], ['#/search', 'search', '検索'], ['#/me', 'user', 'マイページ']];
+const md = d => { const x = new Date(d + 'T00:00:00'); return `${x.getMonth() + 1}/${x.getDate()} (${'日月火水木金土'[x.getDay()]})`; };
+const ago = s => { const m = (Date.now() - new Date(s)) / 6e4; return m < 60 ? `${Math.max(1, Math.round(m))}分前` : m < 1440 ? `${Math.round(m / 60)}時間前` : `${Math.round(m / 1440)}日前`; };
+const subName = id => (st.subjects.find(s => s.id === id) || {}).name || '';
+const cnt = t => st.conf.filter(c => c.tip_id === t.id).length;
+function item(t) {
+  return `<a class="item" href="#/s/${t.subject_id}" style="--ac:${ac(t.subject_id)}"><div class="ico">${svg('chk', 26)}</div><div class="tx"><span class="tag">${esc(t.source)}</span>${t.needs_correction ? '<span class="tag red">訂正あり</span>' : ''}<p>${esc(t.body)}</p><small>${esc(subName(t.subject_id))} / ${ago(t.created_at)} / 確認 ${cnt(t)}</small></div></a>`;
+}
+
 function route() {
   if (!me) return authView();
   const h = location.hash.slice(2);
   if (h.startsWith('s/')) return subjectView(+h.slice(2));
-  homeView();
+  ({ subjects: subjectsView, write: writeView, search: searchView, fav: favView, me: meView }[h] || homeView)();
 }
 window.addEventListener('hashchange', () => { unitF = ''; route(); });
 
 function shell(inner, back) {
-  app.innerHTML = `<header>${back ? '<a href="#/">← 科目一覧</a>' : '<strong class="logo">ヤマはる</strong>'}<button data-act="out">ログアウト</button></header><main>${inner}</main>`;
+  const cur = location.hash || '#/';
+  app.innerHTML = `<div class="app"><nav class="nav"><div class="brand"><span class="logo">ヤマはる</span></div>${NAV.map(([h, i, t]) => `<a href="${h}" class="${cur === h ? 'on' : ''}">${svg(i)}<span>${t}</span></a>`).join('')}</nav><div class="body"><header class="top">${back ? '<a class="back" href="#/subjects">← 科目一覧</a>' : '<span class="logo mob">ヤマはる</span>'}</header><main>${inner}</main></div></div>`;
   window.scrollTo(0, 0);
 }
 
@@ -147,21 +195,58 @@ function authView() {
 function homeView() {
   const subs = st.subjects.map(s => ({ ...s, d: daysLeft(s.exam_date) }));
   const up = subs.filter(s => s.d !== null && s.d >= 0).sort((a, b) => a.d - b.d);
-  const none = subs.filter(s => s.d === null);
-  const past = subs.filter(s => s.d !== null && s.d < 0);
-  const lab = s => s.d === null ? '<span class="d off">試験日未設定</span>' : s.d < 0 ? '<span class="d off">終了</span>' : `<span class="d">あと${s.d}日</span>`;
-  const row = s => `<a class="row" style="--ac:${ac(s.id)}" href="#/s/${s.id}"><span>${esc(s.name)}</span>${lab(s)}</a>`;
-  const first = up[0];
-  const hero = first ? `<a class="hero" href="#/s/${first.id}"><div class="big">${first.d === 0 ? '今日' : 'あと' + first.d + '日'}</div><div class="nm">${esc(first.name)}の試験</div></a>` : '';
-  const subName = id => (st.subjects.find(s => s.id === id) || {}).name || '';
-  const recent = st.tips.slice(0, 5).map(t => `<article class="tip" style="--ac:${ac(t.subject_id)}"><p class="body"><mark>${esc(t.body)}</mark></p><p class="meta"><a href="#/s/${t.subject_id}">${esc(subName(t.subject_id))}</a><span>${esc(t.profiles?.display_name)}</span><span>${fmt(t.created_at)}</span></p></article>`).join('');
-  shell(`${hero}${up.slice(1).concat(none, past).map(row).join('')}
-  ${subs.length ? '' : '<p class="empty">まず科目を追加しましょう。例：解剖生理II</p>'}
-  <details ${subs.length ? '' : 'open'}><summary>科目を追加する</summary>
-    <form id="addSubject"><label for="sn">科目名</label><input id="sn" name="name" required>
-    <label for="sd">試験日（あとから変更できます）</label><input id="sd" name="exam_date" type="date">
-    <div style="margin-top:14px"><button class="btn">追加する</button></div></form></details>
-  <h2>新しいでるとこ</h2>${recent || '<p class="empty">まだ投稿がありません。科目を開いて最初の1件を書いてみましょう。</p>'}`);
+  const f = up[0];
+  const hero = f
+    ? `<a class="hero" href="#/s/${f.id}"><div><div class="big">${f.d === 0 ? '<b>今日</b>' : `あと<b>${f.d}</b>日`}</div><div class="nm">${esc(f.name)}の試験</div><span class="pill">詳細を見る ›</span></div>${svg('cal', 110)}</a>`
+    : `<a class="hero" href="#/subjects"><div><div class="nm">まず科目と試験日を登録しよう</div><span class="pill">科目を追加 ›</span></div>${svg('cal', 110)}</a>`;
+  const tile = (h, i, t, c) => `<a href="${h}" class="${c || ''}">${svg(i, 26)}<span>${t}</span></a>`;
+  const pop = st.subjects.map(s => ({ s, n: st.tips.filter(t => t.subject_id === s.id).length })).sort((a, b) => b.n - a.n).slice(0, 3);
+  shell(`<form id="homeSearch" class="sbar">${svg('search', 20)}<input name="q" placeholder="キーワードで検索…" aria-label="検索"></form>
+  ${hero}
+  <div class="tiles">${tile('#/write', 'pen', '投稿する')}${tile('#/subjects', 'list', 'テスト一覧')}${tile('#/search', 'search', '検索する')}${tile('#/fav', 'star', 'お気に入り', 'y')}</div>
+  <div class="cols"><section class="card2"><h2>最新の投稿</h2>${st.tips.slice(0, 4).map(item).join('') || '<p class="empty">まだ投稿がありません。「投稿する」から最初の1件を書いてみましょう。</p>'}</section>
+  <div><section class="card2"><h2>今後のテスト</h2>${up.slice(0, 3).map(s => `<a class="up" href="#/s/${s.id}" style="--ac:${ac(s.id)}"><span>${md(s.exam_date)}</span><span class="chipc">${esc(s.name)}</span></a>`).join('') || '<p class="empty">試験日がまだありません。</p>'}</section>
+  <section class="card2"><h2>人気の科目</h2>${pop.map((p, k) => `<a class="up" href="#/s/${p.s.id}"><span>${k + 1}　${esc(p.s.name)}</span><span class="sub">${p.n}件</span></a>`).join('') || '<p class="empty">科目がまだありません。</p>'}</section></div></div>`);
+}
+
+function subjectsView() {
+  const key = s => s.d === null ? 1e6 : s.d < 0 ? 5e5 - s.d : s.d;
+  const subs = st.subjects.map(s => ({ ...s, d: daysLeft(s.exam_date) })).sort((a, b) => key(a) - key(b));
+  const lab = s => s.d === null ? '試験日未設定' : s.d < 0 ? '終了' : s.d === 0 ? '今日' : `あと${s.d}日`;
+  shell(`<h1>テスト一覧</h1>${subs.map(s => `<a class="row" style="--ac:${ac(s.id)}" href="#/s/${s.id}"><span>${esc(s.name)}</span><span class="d ${s.d === null || s.d < 0 ? 'off' : ''}">${lab(s)}</span></a>`).join('')}
+  <details ${subs.length ? '' : 'open'}><summary>科目を追加する</summary><form id="addSubject"><label for="sn">科目名</label><input id="sn" name="name" required>
+  <label for="sd">試験日（あとから変更できます）</label><input id="sd" name="exam_date" type="date"><div style="margin-top:14px"><button class="btn">追加する</button></div></form></details>`);
+}
+
+function writeView() {
+  if (!st.subjects.length) return shell('<h1>投稿する</h1><p class="empty">先に「テスト一覧」で科目を追加してください。</p>');
+  const sel = st.subjects.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+  const opts = ['先生の発言', '資料', '過去問', 'その他'].map(o => `<option ${o === lastSource ? 'selected' : ''}>${o}</option>`).join('');
+  shell(`<h1>投稿する</h1><form id="addTip" class="card"><label for="ws">科目</label><select id="ws" name="sid">${sel}</select>
+  <label for="tb">内容（一言でOK）</label><textarea id="tb" name="body" required></textarea>
+  <label for="ts">情報源</label><select id="ts" name="source">${opts}</select>
+  <label for="tu">単元（任意）</label><input id="tu" name="unit" placeholder="例：骨盤"><div style="margin-top:14px"><button class="btn">投稿する</button></div></form>`);
+}
+
+function searchResults() {
+  const q = searchQ.trim().toLowerCase();
+  if (!q) return '<p class="empty">キーワードを入れると、でるところを探せます。</p>';
+  const r = st.tips.filter(t => (t.body + (t.unit || '') + subName(t.subject_id)).toLowerCase().includes(q));
+  return r.length ? `<section class="card2">${r.map(item).join('')}</section>` : '<p class="empty">見つかりませんでした。</p>';
+}
+function searchView() {
+  shell(`<h1>検索</h1><input id="q" class="srch" type="search" placeholder="キーワードで検索…" value="${esc(searchQ)}" aria-label="検索"><div id="res">${searchResults()}</div>`);
+}
+
+function favView() {
+  const r = st.tips.filter(t => st.conf.some(c => c.tip_id === t.id && c.user_id === me.id));
+  shell(`<h1>お気に入り</h1><p class="sub">「確認した」を押した投稿が、ここに集まります。</p><section class="card2">${r.map(item).join('') || '<p class="empty">まだありません。</p>'}</section>`);
+}
+
+function meView() {
+  const mine = st.tips.filter(t => t.author_id === me.id);
+  shell(`<h1>マイページ</h1><section class="card2"><p style="margin:12px 0 0"><b>${esc(me.display_name)}</b> さん${me.is_admin ? '（管理者）' : ''}</p><p class="sub" style="margin:0 0 12px">投稿 ${mine.length}件</p><button class="btn" data-act="out" style="margin-bottom:10px">ログアウト</button></section>
+  <h2>自分の投稿</h2><section class="card2">${mine.map(item).join('') || '<p class="empty">まだ投稿がありません。</p>'}</section>`);
 }
 
 function tipHTML(t) {
@@ -231,6 +316,7 @@ app.addEventListener('submit', async e => {
   const f = e.target, d = Object.fromEntries(new FormData(f));
   try {
     if (f.id === 'auth') return await doAuth(d);
+    if (f.id === 'homeSearch') { searchQ = d.q || ''; location.hash = '#/search'; return; }
     if (f.id === 'addSubject') {
       const r = await sb.from('subjects').insert({ name: d.name.trim(), exam_date: d.exam_date || null });
       if (r.error) throw r.error;
@@ -238,6 +324,7 @@ app.addEventListener('submit', async e => {
       const r = await sb.from('tips').insert({ subject_id: +d.sid, body: d.body.trim(), source: d.source, unit: d.unit.trim() || null });
       if (r.error) throw r.error;
       lastSource = d.source;
+      if (location.hash === '#/write') location.hash = '#/s/' + d.sid;
     }
     await load(); route();
   } catch (err) { toast(err.message); }
@@ -281,6 +368,12 @@ app.addEventListener('click', async e => {
     if (r && r.error) throw r.error;
     await load(); route();
   } catch (err) { toast(err.message); }
+});
+
+app.addEventListener('input', e => {
+  if (e.target.id !== 'q') return;
+  searchQ = e.target.value;
+  const el = document.getElementById('res'); if (el) el.innerHTML = searchResults();
 });
 
 boot();
