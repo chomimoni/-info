@@ -119,14 +119,16 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 // ▲
 
 const sb = supabase.createClient(SB_URL, SB_KEY);
+const VAPID_PUB = 'BGQLcgZDJ48XSsl4hJX9RQN9fOGd7F3lvHcDrmAuArMfLxAfrrv-A6owY-Upmp4uWHK-H3EV6xe66NwOkZkkQbg';
+let pushOn = false;
 const app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let me = null, authMode = 'login', unitF = '', sortBy = 'new', lastSource = '先生の発言';
 let st = { subjects: [], tips: [], conf: [], cm: [], qs: [] };
 
-function toast(msg) {
+function toast(msg, ok) {
   const t = document.getElementById('toast');
-  t.textContent = msg; t.style.display = 'block';
+  t.textContent = msg; t.style.display = 'block'; t.style.background = ok ? 'var(--blue)' : 'var(--red)';
   clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', 4000);
 }
 function daysLeft(d) {
@@ -150,6 +152,38 @@ async function load() {
   st = { subjects: a.data, tips: b.data, conf: c.data, cm: d.data, qs: e.data };
 }
 
+const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const b64u = s => { const b = atob((s + '='.repeat((4 - s.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(b, c => c.charCodeAt(0)); };
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then(async reg => {
+    const s = 'PushManager' in window ? await reg.pushManager.getSubscription() : null;
+    pushOn = !!s; if (me && location.hash === '#/me') route();
+  }).catch(() => {});
+  navigator.serviceWorker.addEventListener('message', e => { if (e.data && typeof e.data.url === 'string') location.hash = e.data.url || '#/'; });
+}
+async function togglePush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window))
+    throw new Error(isIOS && !standalone ? 'iPhoneでは、ホーム画面に追加した「ヤマはる」のアイコンから開くと、通知をオンにできます' : 'この端末・ブラウザは通知に対応していません');
+  if (pushOn) {
+    const reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+    if (sub) { await sb.rpc('delete_push', { p_endpoint: sub.endpoint }); await sub.unsubscribe(); }
+    pushOn = false; toast('通知をオフにしました', true); return route();
+  }
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') throw new Error('通知が許可されませんでした。iPhoneの「設定」→「通知」→「ヤマはる」から許可できます');
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID_PUB) });
+  const j = sub.toJSON();
+  const r = await sb.rpc('save_push', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth });
+  if (r.error) throw r.error;
+  pushOn = true; toast('通知をオンにしました', true); route();
+}
+async function testPush() {
+  const { data, error } = await sb.functions.invoke('send-push', { body: { type: 'test' } });
+  if (error) throw new Error('テスト通知を送れませんでした：' + error.message);
+  toast(data && data.sent ? 'テスト通知を送りました。数秒で届きます' : '送信先がありません。先に通知をオンにしてください', !!(data && data.sent));
+}
 async function boot() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { me = null; return route(); }
@@ -265,6 +299,7 @@ function favView() {
 function meView() {
   const mine = st.tips.filter(t => t.author_id === me.id);
   shell(`<h1>マイページ</h1><section class="card2"><p style="margin:12px 0 0"><b>${esc(me.display_name)}</b> さん${me.is_admin ? '（管理者）' : ''}</p><p class="sub" style="margin:0 0 12px">投稿 ${mine.length}件</p><button class="btn" data-act="out" style="margin-bottom:10px">ログアウト</button></section>
+  <h2>通知</h2><section class="card2"><p style="margin:12px 0 4px">新しいでるとこ、自分の投稿へのコメント、試験の3日前と前日（朝8時）にお知らせします。</p><p class="sub" style="margin:0 0 10px">${pushOn ? 'この端末では通知がオンです' : isIOS && !standalone ? 'iPhoneでは、ホーム画面に追加したアイコンから開くとオンにできます' : '通知はオフです'}</p><button class="btn" data-act="push" style="margin-bottom:10px">${pushOn ? '通知をオフにする' : '通知をオンにする'}</button>${pushOn ? '<button class="chip" data-act="testpush" style="width:100%;margin-bottom:12px">テスト通知を送る</button>' : ''}</section>
   <h2>自分の投稿</h2><section class="card2">${mine.map(item).join('') || '<p class="empty">まだ投稿がありません。</p>'}</section>`);
 }
 
@@ -541,7 +576,12 @@ app.addEventListener('click', async e => {
   const a = b.dataset.act, id = +b.dataset.id;
   try {
     if (a === 'mode') { authMode = authMode === 'login' ? 'reg' : 'login'; return route(); }
-    if (a === 'out') { await sb.auth.signOut(); me = null; return route(); }
+    if (a === 'push') return await togglePush();
+    if (a === 'testpush') return await testPush();
+    if (a === 'out') {
+      try { if (pushOn) { const reg = await navigator.serviceWorker.ready, s = await reg.pushManager.getSubscription(); if (s) { await sb.rpc('delete_push', { p_endpoint: s.endpoint }); await s.unsubscribe(); } pushOn = false; } } catch (_) {}
+      await sb.auth.signOut(); me = null; return route();
+    }
     if (a === 'write') { const t = document.getElementById('tb'); t.scrollIntoView({ behavior: 'smooth', block: 'center' }); return t.focus({ preventScroll: true }); }
     if (a === 'edit') { editId = id; route(); const e = document.getElementById('eb'); if (e) { e.scrollIntoView({ block: 'center' }); e.focus({ preventScroll: true }); } return; }
     if (a === 'cancel') { editId = null; return route(); }
