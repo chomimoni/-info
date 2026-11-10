@@ -169,6 +169,7 @@ function subjectView(id) {
   const s = st.subjects.find(x => x.id === id);
   if (!s) { location.hash = '#/'; return; }
   const tips = st.tips.filter(t => t.subject_id === id);
+  const canDel = me.is_admin || (s.created_by === me.id && !tips.length);
   const units = [...new Set(tips.map(t => t.unit).filter(Boolean))];
   const cnt = t => st.conf.filter(c => c.tip_id === t.id).length;
   let list = unitF ? tips.filter(t => t.unit === unitF) : tips.slice();
@@ -178,6 +179,7 @@ function subjectView(id) {
   const opts = ['先生の発言', '資料', '過去問', 'その他'].map(o => `<option ${o === lastSource ? 'selected' : ''}>${o}</option>`).join('');
   shell(`<h1>${esc(s.name)}</h1><p class="sub">${dl}</p>
   <label for="examDate">試験日</label><input id="examDate" type="date" value="${s.exam_date || ''}" data-sid="${s.id}">
+  ${canDel ? `<div style="margin-top:10px"><button class="chip" data-act="delsub" data-id="${s.id}">この科目を削除</button></div>` : ''}
   <h2>でるところを書く</h2>
   <form id="addTip" class="card"><input type="hidden" name="sid" value="${s.id}">
     <label for="tb">内容（一言でOK）</label><textarea id="tb" name="body" required></textarea>
@@ -252,6 +254,12 @@ app.addEventListener('click', async e => {
     } else if (a === 'del') {
       if (!confirm('この投稿を削除しますか？')) return;
       r = await sb.from('tips').delete().eq('id', id);
+    } else if (a === 'delsub') {
+      const n = st.tips.filter(t => t.subject_id === id).length;
+      if (!confirm(n ? `この科目と、中の投稿${n}件をすべて削除しますか？元に戻せません。` : 'この科目を削除しますか？')) return;
+      r = await sb.from('subjects').delete().eq('id', id).select();
+      if (!r.error && !r.data.length) throw new Error('削除できませんでした。他の人の投稿がある科目は、管理者だけが削除できます');
+      location.hash = '#/';
     }
     if (r && r.error) throw r.error;
     await load(); route();
