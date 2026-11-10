@@ -78,7 +78,11 @@ h2+.up{border-top:0}
 .tip{background:var(--card);border-radius:16px;box-shadow:var(--sh);border-left:5px solid var(--ac,var(--line));padding:14px;margin-bottom:12px}
 .tip.fix{border-left-color:var(--red)}
 .tip .flag{margin:0 0 6px;color:var(--red);font-weight:700;font-size:14px}
-.tip .body{margin:0 0 8px;font-size:17px}
+.tip .body{margin:0 0 8px;font-size:17px;white-space:pre-wrap}
+.tip .ttl{margin:0 0 6px;font-size:19px;font-weight:900;line-height:1.45}
+.tip .ttl+.body{font-size:15.5px;color:#2b3c5c}
+.tx .sn{font-weight:500;color:var(--sub);font-size:13px;margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.wtop{display:flex;gap:8px;margin:12px 0 4px}
 mark{background:linear-gradient(transparent 55%,var(--hl) 55%);color:inherit;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 .meta{display:flex;flex-wrap:wrap;gap:2px 12px;color:var(--sub);font-size:13px;margin:0 0 10px}
 .meta a{color:var(--blue)}
@@ -227,7 +231,7 @@ const ago = s => { const m = (Date.now() - new Date(s)) / 6e4; return m < 60 ? `
 const subName = id => (st.subjects.find(s => s.id === id) || {}).name || '';
 const cnt = t => st.conf.filter(c => c.tip_id === t.id).length;
 function item(t) {
-  return `<a class="item" href="#/s/${t.subject_id}" style="--ac:${ac(t.subject_id)}"><div class="ico">${svg('chk', 26)}</div><div class="tx"><span class="tag">${esc(t.source)}</span>${t.needs_correction ? '<span class="tag red">訂正あり</span>' : ''}<p>${esc(t.body)}</p><small>${esc(subName(t.subject_id))} / ${ago(t.created_at)} / 確認 ${cnt(t)} / コメント ${st.cm.filter(c => c.tip_id === t.id).length}</small></div></a>`;
+  return `<a class="item" href="#/s/${t.subject_id}" style="--ac:${ac(t.subject_id)}"><div class="ico">${svg('chk', 26)}</div><div class="tx"><span class="tag">${esc(t.source)}</span>${t.needs_correction ? '<span class="tag red">訂正あり</span>' : ''}<p>${esc(t.title || t.body)}</p>${t.title && t.body ? `<p class="sn">${esc(t.body)}</p>` : ''}<small>${esc(subName(t.subject_id))} / ${ago(t.created_at)} / 確認 ${cnt(t)} / コメント ${st.cm.filter(c => c.tip_id === t.id).length}</small></div></a>`;
 }
 
 function route() {
@@ -299,20 +303,25 @@ function subjectsView() {
   <label for="sd">試験日（あとから変更できます）</label><input id="sd" name="exam_date" type="date"><label for="sp">時限（任意）</label><select id="sp" name="exam_period">${perOpts("")}</select><div style="margin-top:14px"><button class="btn">追加する</button></div></form></details>`);
 }
 
+let writeSid = null;
 function writeView() {
   if (!st.subjects.length) return shell('<h1>投稿する</h1><p class="empty">先に「テスト一覧」で科目を追加してください。</p>');
-  const sel = st.subjects.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+  const sel = st.subjects.map(s => `<option value="${s.id}" ${s.id === writeSid ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
   const opts = ['先生の発言', '資料', '過去問', 'その他'].map(o => `<option ${o === lastSource ? 'selected' : ''}>${o}</option>`).join('');
+  const units = [...new Set(st.tips.map(t => t.unit).filter(Boolean))];
   shell(`<h1>投稿する</h1><form id="addTip" class="card"><label for="ws">科目</label><select id="ws" name="sid">${sel}</select>
-  <label for="tb">内容（一言でOK）</label><textarea id="tb" name="body" required></textarea>
+  <label for="tt">タイトル</label><input id="tt" name="title" maxlength="60" required placeholder="例：骨盤の名称は全部出る">
+  <label for="tb">本文（任意）</label><textarea id="tb" name="body" placeholder="例：寛骨・仙骨・尾骨。図で場所も聞かれると先生が言っていた"></textarea>
   <label for="ts">情報源</label><select id="ts" name="source">${opts}</select>
-  <label for="tu">単元（任意）</label><input id="tu" name="unit" placeholder="例：骨盤"><label for="ti">画像（任意）</label><input id="ti" name="img" type="file" accept="image/*"><div style="margin-top:14px"><button class="btn">投稿する</button></div></form>`);
+  <label for="tu">単元（任意）</label><input id="tu" name="unit" list="ul" placeholder="例：骨盤"><datalist id="ul">${units.map(u => `<option value="${esc(u)}">`).join('')}</datalist>
+  <label for="ti">画像（任意）</label><input id="ti" name="img" type="file" accept="image/*">
+  <div style="margin-top:14px"><button class="btn">投稿する</button></div></form>`, writeSid ? 's/' + writeSid : false);
 }
 
 function searchResults() {
   const q = searchQ.trim().toLowerCase();
   if (!q) return '<p class="empty">キーワードを入れると、でるところを探せます。</p>';
-  const r = st.tips.filter(t => (t.body + (t.unit || '') + subName(t.subject_id)).toLowerCase().includes(q));
+  const r = st.tips.filter(t => ((t.title || '') + t.body + (t.unit || '') + subName(t.subject_id)).toLowerCase().includes(q));
   return r.length ? `<section class="card2">${r.map(item).join('')}</section>` : '<p class="empty">見つかりませんでした。</p>';
 }
 function searchView() {
@@ -335,7 +344,8 @@ let editId = null;
 function editForm(t) {
   const opts = ['先生の発言', '資料', '過去問', 'その他'].map(o => `<option ${o === t.source ? 'selected' : ''}>${o}</option>`).join('');
   return `<form id="editTip" class="card" style="--ac:${ac(t.subject_id)}"><input type="hidden" name="tid" value="${t.id}">
-    <label for="eb">内容</label><textarea id="eb" name="body" required>${esc(t.body)}</textarea>
+    <label for="et">タイトル</label><input id="et" name="title" maxlength="60" value="${esc(t.title || '')}" ${t.title ? 'required' : ''}>
+    <label for="eb">本文</label><textarea id="eb" name="body">${esc(t.body)}</textarea>
     <label for="es">情報源</label><select id="es" name="source">${opts}</select>
     <label for="eu">単元（任意）</label><input id="eu" name="unit" value="${esc(t.unit || '')}">
     <div class="acts" style="margin-top:14px"><button class="btn" style="flex:1">保存する</button><button type="button" data-act="cancel">やめる</button></div></form>`;
@@ -347,7 +357,7 @@ function tipHTML(t) {
   const can = t.author_id === me.id || me.is_admin;
   return `<article class="tip ${t.needs_correction ? 'fix' : ''}" style="--ac:${ac(t.subject_id)}">
     ${t.needs_correction ? '<p class="flag">訂正あり：範囲が変わった可能性があります</p>' : ''}
-    <p class="body"><mark>${esc(t.body)}</mark></p>${t.image_path ? `<img class="pic" data-path="${esc(t.image_path)}" alt="投稿の画像">` : ''}
+    ${t.title ? `<h3 class="ttl"><mark>${esc(t.title)}</mark></h3>${t.body ? `<p class="body">${esc(t.body)}</p>` : ''}` : `<p class="body"><mark>${esc(t.body)}</mark></p>`}${t.image_path ? `<img class="pic" data-path="${esc(t.image_path)}" alt="投稿の画像">` : ''}
     <p class="meta"><span>${esc(t.source)}</span>${t.unit ? `<span>${esc(t.unit)}</span>` : ''}<span>${esc(t.profiles?.display_name)}</span><span>${fmt(t.created_at)}</span></p>
     <div class="acts">
       <button class="cf ${mine ? 'on' : ''}" data-act="conf" data-id="${t.id}">${mine ? '確認済み' : '確認した'} ${n}</button>
@@ -368,18 +378,11 @@ function subjectView(id) {
   const d = daysLeft(s.exam_date);
   const dl = d === null ? '試験日未設定' : d < 0 ? '試験は終了しました' : d === 0 ? '試験は今日です' : `試験まであと${d}日`;
   const dlp = d !== null && d >= 0 && s.exam_period ? `（${s.exam_period}限）` : '';
-  const opts = ['先生の発言', '資料', '過去問', 'その他'].map(o => `<option ${o === lastSource ? 'selected' : ''}>${o}</option>`).join('');
   shell(`<h1>${esc(s.name)}</h1><p class="sub">${dl}${dlp}</p>
   <label for="examDate">試験日</label><input id="examDate" type="date" value="${s.exam_date || ''}" data-sid="${s.id}">
   <label for="examPer">時限</label><select id="examPer" data-sid="${s.id}">${perOpts(s.exam_period)}</select>
   ${canDel ? `<div style="margin-top:10px"><button class="chip" data-act="delsub" data-id="${s.id}">この科目を削除</button></div>` : ''}
-  <h2>でるところを書く</h2>
-  <form id="addTip" class="card"><input type="hidden" name="sid" value="${s.id}">
-    <label for="tb">内容（一言でOK）</label><textarea id="tb" name="body" required></textarea>
-    <label for="ts">情報源</label><select id="ts" name="source">${opts}</select>
-    <label for="tu">単元（任意）</label><input id="tu" name="unit" list="ul" placeholder="例：骨盤">
-    <datalist id="ul">${units.map(u => `<option value="${esc(u)}">`).join('')}</datalist>
-    <label for="ti">画像（任意）</label><input id="ti" name="img" type="file" accept="image/*"><div style="margin-top:14px"><button class="btn">投稿する</button></div></form>
+  <button class="btn" data-act="towrite" data-id="${s.id}" style="margin-top:16px">＋ この科目のでるところを書く</button>
   <h2>みんなのでるとこ</h2>
   <div class="chips">
     <button class="chip ${unitF ? '' : 'on'}" data-act="unit" data-u="">すべて</button>
@@ -387,7 +390,7 @@ function subjectView(id) {
     <button class="chip" data-act="sort">${sortBy === 'conf' ? '並び：確認が多い順' : '並び：新しい順'}</button>
   </div>
   ${list.map(tipHTML).join('') || '<p class="empty">まだ投稿がありません。最初の1件を書いてみましょう。</p>'}
-  <button class="fab" data-act="write">＋ 書く</button>`, true);
+  <button class="fab" data-act="towrite" data-id="${s.id}">＋ 書く</button>`, true);
   document.querySelector('h1').style.cssText = `border-left:8px solid ${ac(s.id)};padding-left:10px`;
 }
 
@@ -487,11 +490,11 @@ function qNewView() {
   if (!st.subjects.length) return shell('<h1>問題を作る</h1><p class="empty">先に「テスト一覧」で科目を追加してください。</p>', 'q');
   const t = st.tips.find(x => x.id === qFromTip);
   const sel = st.subjects.map(s => `<option value="${s.id}" ${t && t.subject_id === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
-  shell(`<h1>問題を作る</h1>${t ? `<p class="sub">元のでるとこ：${esc(t.body)}</p>` : ''}
+  shell(`<h1>問題を作る</h1>${t ? `<p class="sub">元のでるとこ：${esc(t.title || t.body)}</p>` : ''}
   <form id="addQ" class="card"><input type="hidden" name="tip" value="${t ? t.id : ''}">
   <label for="qs">科目</label><select id="qs" name="sid">${sel}</select>
   <label for="qk">形式</label><select id="qk" name="kind">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join('')}</select>
-  <label for="qb">問題文</label><textarea id="qb" name="body" required>${t ? esc(t.body) : ''}</textarea>
+  <label for="qb">問題文</label><textarea id="qb" name="body" required>${t ? esc([t.title, t.body].filter(Boolean).join('\n')) : ''}</textarea>
   <label for="qd">答え・選択肢</label><p class="sub" id="qh" style="margin:0 0 4px">${KINDS.single[1]}</p><textarea id="qd" name="data"></textarea>
   <label for="qe">解説（任意）</label><textarea id="qe" name="exp"></textarea>
   <label for="qi">画像（任意）</label><input id="qi" name="img" type="file" accept="image/*">
@@ -559,7 +562,7 @@ app.addEventListener('submit', async e => {
   try {
     if (f.id === 'auth') return await doAuth(d);
     if (f.id === 'editTip') {
-      const r = await sb.from('tips').update({ body: d.body.trim(), source: d.source, unit: d.unit.trim() || null }).eq('id', +d.tid).select();
+      const r = await sb.from('tips').update({ title: d.title.trim() || null, body: d.body.trim(), source: d.source, unit: d.unit.trim() || null }).eq('id', +d.tid).select();
       if (r.error) throw r.error;
       if (!r.data.length) throw new Error('編集できませんでした。自分の投稿か確認してください');
       editId = null;
@@ -582,10 +585,10 @@ app.addEventListener('submit', async e => {
       if (r.error) throw r.error;
     } else if (f.id === 'addTip') {
       const image_path = await upImg(d.img);
-      const r = await sb.from('tips').insert({ subject_id: +d.sid, body: d.body.trim(), source: d.source, unit: d.unit.trim() || null, image_path });
+      const r = await sb.from('tips').insert({ subject_id: +d.sid, title: d.title.trim(), body: d.body.trim(), source: d.source, unit: d.unit.trim() || null, image_path });
       if (r.error) throw r.error;
       lastSource = d.source;
-      if (location.hash === '#/write') location.hash = '#/s/' + d.sid;
+      writeSid = +d.sid; await load(); location.hash = '#/s/' + d.sid; return;
     }
     await load(); route();
   } catch (err) { toast(err.message); }
@@ -613,8 +616,8 @@ app.addEventListener('click', async e => {
       try { if (pushOn) { const reg = await navigator.serviceWorker.ready, s = await reg.pushManager.getSubscription(); if (s) { await sb.rpc('delete_push', { p_endpoint: s.endpoint }); await s.unsubscribe(); } pushOn = false; } } catch (_) {}
       await sb.auth.signOut(); me = null; return route();
     }
-    if (a === 'write') { const t = document.getElementById('tb'); t.scrollIntoView({ behavior: 'smooth', block: 'center' }); return t.focus({ preventScroll: true }); }
-    if (a === 'edit') { editId = id; route(); const e = document.getElementById('eb'); if (e) { e.scrollIntoView({ block: 'center' }); e.focus({ preventScroll: true }); } return; }
+    if (a === 'towrite') { writeSid = id; location.hash = '#/write'; return; }
+    if (a === 'edit') { editId = id; route(); const e = document.getElementById('et'); if (e) { e.scrollIntoView({ block: 'center' }); e.focus({ preventScroll: true }); } return; }
     if (a === 'cancel') { editId = null; return route(); }
     if (a === 'cm') { openTip = openTip === id ? null : id; return route(); }
     if (a === 'mkq') { qFromTip = id; location.hash = '#/qnew'; return; }
