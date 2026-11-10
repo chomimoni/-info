@@ -119,6 +119,12 @@ textarea{min-height:84px}
 .res.ok h2{color:#1E9E5A;border-color:#1E9E5A}.res.ng h2{color:var(--red);border-color:var(--red)}
 .lnk{display:flex;align-items:center;justify-content:center;text-decoration:none;min-height:48px}
 .big2{font-size:32px;font-weight:900;margin:14px 0}
+.ql{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+h2+.ql{border-top:0}
+.ql .qt{min-width:0}.ql .qt p{margin:0;font-weight:700;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ql .qt small{color:var(--sub)}
+.mk{font-weight:900}.mk.ok{color:#1E9E5A}.mk.ng{color:var(--red)}
+.tag.warn{background:#FFF3C4;color:#8A6400}
 .seq{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;min-height:30px}
 :focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 </style>
@@ -139,7 +145,7 @@ let pushOn = false;
 const app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let me = null, authMode = 'login', unitF = '', sortBy = 'new', lastSource = '先生の発言';
-let st = { subjects: [], tips: [], conf: [], cm: [], qs: [] };
+let st = { subjects: [], tips: [], conf: [], cm: [], qs: [], att: [], qst: [], rep: [] };
 
 function toast(msg, ok) {
   const t = document.getElementById('toast');
@@ -158,16 +164,19 @@ const byPer = (a, b) => (a.exam_period || 99) - (b.exam_period || 99);
 const fmt = s => new Date(s).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
 
 async function load() {
-  const [a, b, c, d, e] = await Promise.all([
+  const [a, b, c, d, e, f, g, h] = await Promise.all([
     sb.from('subjects').select('*').order('name'),
     sb.from('tips').select('*, profiles!author_id(display_name)').order('created_at', { ascending: false }),
     sb.from('tip_confirmations').select('*'),
     sb.from('comments').select('*, profiles!author_id(display_name)').order('created_at'),
-    sb.from('questions').select('*').order('created_at')
+    sb.from('questions').select('*').order('created_at'),
+    sb.from('attempts').select('id, question_id, correct, created_at').eq('user_id', me.id).order('created_at'),
+    sb.from('question_stats').select('*'),
+    sb.from('question_reports').select('*, profiles!reporter_id(display_name)').order('created_at')
   ]);
-  const err = a.error || b.error || c.error || d.error || e.error;
+  const err = [a, b, c, d, e, f, g, h].map(x => x.error).find(Boolean);
   if (err) throw err;
-  st = { subjects: a.data, tips: b.data, conf: c.data, cm: d.data, qs: e.data };
+  st = { subjects: a.data, tips: b.data, conf: c.data, cm: d.data, qs: e.data, att: f.data, qst: g.data, rep: h.data };
 }
 
 const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
@@ -238,7 +247,7 @@ function route() {
   if (!me) return authView();
   const h = location.hash.slice(2);
   if (h.startsWith('s/')) return subjectView(+h.slice(2));
-  if (h.startsWith('q/')) return playView(+h.slice(2));
+  if (h.startsWith('q/')) return playView(h.slice(2));
   ({ subjects: subjectsView, write: writeView, search: searchView, fav: favView, me: meView, q: qView, qnew: qNewView }[h] || homeView)();
 }
 window.addEventListener('hashchange', () => { unitF = ''; route(); });
@@ -424,12 +433,13 @@ const KINDS = {
   single: ['単一選択', '選択肢を1行ずつ書き、正解の行の先頭に * を付けます'],
   multi: ['複数選択', '選択肢を1行ずつ書き、正解すべての先頭に * を付けます'],
   tf: ['正誤（○×）', '正解を ○ か × の1文字で書きます'],
-  fill: ['穴埋め', '問題文の答えにしたい部分を［ ］で囲みます（この欄は空でOK）'],
+  fill: ['穴埋め', '問題文の答えにしたい部分を［ ］で囲みます。別解は／で区切ります（例：［寛骨／かんこつ］）。この欄は空でOK'],
   order: ['並べ替え', '正しい順番に1行ずつ書きます'],
   match: ['マッチング', '1行に「左＝右」の形で書きます（2行以上）'],
-  word: ['単語', '正解の単語を書きます。別解があれば1行ずつ追加します']
+  word: ['単語', '正解の単語を書きます。別解は1行ずつ追加するか、／で区切ります']
 };
-const nz = s => String(s ?? '').normalize('NFKC').replace(/\s+/g, '').toLowerCase();
+const nz = s => String(s ?? '').normalize('NFKC').replace(/\s+/g, '').toLowerCase().replace(/[\u30a1-\u30f6]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
+const alts = a => String(a).split(/[／/|｜]/).map(x => x.trim()).filter(Boolean);
 const shuf = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(x => x[1]);
 const BR = /[［\[]([^］\]]+)[］\]]/g;
 function parseQ(kind, body, data) {
@@ -464,7 +474,7 @@ const corr = q => {
   const a = JSON.parse(q.answer);
   return q.kind === 'single' || q.kind === 'multi' ? a.map(k => q.choices[k]).join('、')
     : q.kind === 'tf' ? a : q.kind === 'order' ? a.join(' → ')
-    : q.kind === 'match' ? a.map(p => p.join('＝')).join('、') : q.kind === 'word' ? a[0] : a.join('、');
+    : q.kind === 'match' ? a.map(p => p.join('＝')).join('、') : q.kind === 'word' ? a.flatMap(alts).join(' / ') : a.map(x => alts(x).join(' / ')).join('、');
 };
 function judge(vals) {
   const q = play.list[play.i], ans = JSON.parse(q.answer), p = play.pick;
@@ -472,50 +482,112 @@ function judge(vals) {
   if (q.kind === 'single' || q.kind === 'multi') ok = p.length === ans.length && p.every(k => ans.includes(k));
   else if (q.kind === 'tf') ok = ['○', '×'][p[0]] === ans;
   else if (q.kind === 'order') ok = p.length === ans.length && p.every((k, j) => play.shuf[k] === ans[j]);
-  else if (q.kind === 'fill') ok = ans.every((a, j) => nz(vals['b' + j]) === nz(a));
-  else if (q.kind === 'word') ok = ans.some(a => nz(a) === nz(vals.w));
+  else if (q.kind === 'fill') ok = ans.every((a, j) => alts(a).some(x => nz(vals['b' + j]) === nz(x)));
+  else if (q.kind === 'word') ok = ans.flatMap(alts).some(a => nz(a) === nz(vals.w));
   else ok = ans.every(([, rr], j) => vals['m' + j] === rr);
-  play.res = { ok }; if (ok) play.score++;
+  play.res = { ok }; if (ok) play.score++; else play.miss.push(q);
+  record(q, ok);
 }
+async function record(q, ok) {
+  const r = await sb.from('attempts').insert({ question_id: q.id, correct: ok }).select('id, question_id, correct, created_at').single();
+  if (r.error) return toast(r.error.message);
+  st.att.push(r.data); if (play) play.attId = r.data.id;
+}
+const lastAtt = qid => { for (let k = st.att.length - 1; k >= 0; k--) if (st.att[k].question_id === qid) return st.att[k]; return null; };
+const isWrong = q => { const a = lastAtt(q.id); return !!a && !a.correct; };
+const rate = q => { const s = st.qst.find(x => x.question_id === q.id); return s && s.n ? { n: s.n, p: Math.round(s.ok * 100 / s.n) } : null; };
+const repsOf = q => st.rep.filter(r => r.question_id === q.id);
+const canQ = q => q.author_id === me.id || me.is_admin;
+const qText = q => q.body.replace(/[［\[]([^］\]]+)[］\]]/g, '（　）');
 
+let qEditId = null, lastMiss = [];
 function qView() {
+  const wrong = st.qs.filter(isWrong);
   const rows = st.subjects.map(s => {
-    const n = st.qs.filter(q => q.subject_id === s.id).length;
-    return `<a class="row" style="--ac:${ac(s.id)}" href="#/q/${s.id}"><span>${esc(s.name)}</span><span class="d ${n ? '' : 'off'}">${n}問　解く ›</span></a>`;
+    const qs = st.qs.filter(q => q.subject_id === s.id), w = qs.filter(isWrong).length;
+    return `<a class="row" style="--ac:${ac(s.id)}" href="#/q/${s.id}"><span>${esc(s.name)}${w ? ` <span class="tag red">間違い${w}</span>` : ''}</span><span class="d ${qs.length ? '' : 'off'}">${qs.length}問 ›</span></a>`;
   }).join('');
-  shell(`<h1>問題</h1><a class="btn lnk" href="#/qnew" style="margin-bottom:14px">＋ 問題を作る</a>${rows || '<p class="empty">先に「テスト一覧」で科目を追加してください。</p>'}`);
+  shell(`<h1>問題</h1><button class="btn" data-act="newq" style="margin-bottom:14px">＋ 問題を作る</button>
+  ${wrong.length ? `<a class="row" href="#/q/review" style="--ac:var(--red)"><span><b>間違えた問題を復習</b><br><small class="sub">全科目から、間違えたままの問題だけ</small></span><span class="d" style="color:var(--red)">${wrong.length}問 ›</span></a>` : ''}
+  ${rows || '<p class="empty">先に「テスト一覧」で科目を追加してください。</p>'}`);
 }
 
+function dataOf(q) {
+  const a = JSON.parse(q.answer);
+  if (q.kind === 'single' || q.kind === 'multi') return q.choices.map((c, k) => (a.includes(k) ? '*' : '') + c).join('\n');
+  if (q.kind === 'tf') return a;
+  if (q.kind === 'order') return q.choices.join('\n');
+  if (q.kind === 'match') return q.choices.map(x => x.join('＝')).join('\n');
+  if (q.kind === 'word') return a.join('\n');
+  return '';
+}
 function qNewView() {
   if (!st.subjects.length) return shell('<h1>問題を作る</h1><p class="empty">先に「テスト一覧」で科目を追加してください。</p>', 'q');
-  const t = st.tips.find(x => x.id === qFromTip);
-  const sel = st.subjects.map(s => `<option value="${s.id}" ${t && t.subject_id === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
-  shell(`<h1>問題を作る</h1>${t ? `<p class="sub">元のでるとこ：${esc(t.title || t.body)}</p>` : ''}
-  <form id="addQ" class="card"><input type="hidden" name="tip" value="${t ? t.id : ''}">
+  const q = qEditId ? st.qs.find(x => x.id === qEditId) : null;
+  if (qEditId && !q) { qEditId = null; location.hash = '#/q'; return; }
+  const t = !q && st.tips.find(x => x.id === qFromTip);
+  const sid = q ? q.subject_id : t ? t.subject_id : null;
+  const kind = q ? q.kind : 'single';
+  const sel = st.subjects.map(s => `<option value="${s.id}" ${s.id === sid ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
+  const units = [...new Set(st.qs.map(x => x.unit).concat(st.tips.map(x => x.unit)).filter(Boolean))];
+  const reps = q ? repsOf(q) : [];
+  shell(`<h1>${q ? '問題を編集' : '問題を作る'}</h1>${t ? `<p class="sub">元のでるとこ：${esc(t.title || t.body)}</p>` : ''}
+  ${reps.length ? `<section class="card2"><h2>届いた報告</h2>${reps.map(r => `<p class="cm"><b>${esc(r.profiles?.display_name)}</b> ${esc(r.body)} <small>${ago(r.created_at)}</small> <button class="chip" data-act="delrep" data-id="${r.id}">解決済みにする</button></p>`).join('')}</section>` : ''}
+  <form id="addQ" class="card"><input type="hidden" name="tip" value="${t ? t.id : q && q.tip_id ? q.tip_id : ''}"><input type="hidden" name="qid" value="${q ? q.id : ''}">
   <label for="qs">科目</label><select id="qs" name="sid">${sel}</select>
-  <label for="qk">形式</label><select id="qk" name="kind">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join('')}</select>
-  <label for="qb">問題文</label><textarea id="qb" name="body" required>${t ? esc([t.title, t.body].filter(Boolean).join('\n')) : ''}</textarea>
-  <label for="qd">答え・選択肢</label><p class="sub" id="qh" style="margin:0 0 4px">${KINDS.single[1]}</p><textarea id="qd" name="data"></textarea>
-  <label for="qe">解説（任意）</label><textarea id="qe" name="exp"></textarea>
-  <label for="qi">画像（任意）</label><input id="qi" name="img" type="file" accept="image/*">
-  <div style="margin-top:14px"><button class="btn">問題を作る</button></div></form>`, 'q');
+  <label for="qk">形式</label><select id="qk" name="kind">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}" ${k === kind ? 'selected' : ''}>${v[0]}</option>`).join('')}</select>
+  <label for="qb">問題文</label><textarea id="qb" name="body" required>${q ? esc(q.body) : t ? esc([t.title, t.body].filter(Boolean).join('\n')) : ''}</textarea>
+  <label for="qd">答え・選択肢</label><p class="sub" id="qh" style="margin:0 0 4px">${KINDS[kind][1]}</p><textarea id="qd" name="data">${q ? esc(dataOf(q)) : ''}</textarea>
+  <label for="qe">解説（任意）</label><textarea id="qe" name="exp">${q ? esc(q.explanation || '') : ''}</textarea>
+  <label for="qu">単元（任意）</label><input id="qu" name="unit" list="qul" value="${esc(q ? q.unit || '' : t ? t.unit || '' : '')}" placeholder="例：骨盤"><datalist id="qul">${units.map(u => `<option value="${esc(u)}">`).join('')}</datalist>
+  ${q && q.image_path ? `<img class="pic" data-path="${esc(q.image_path)}" alt="今の画像"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="rmimg" style="width:auto;min-height:0"> 画像を消す</label>` : ''}
+  <label for="qi">${q && q.image_path ? '画像を差し替える（任意）' : '画像（任意）'}</label><input id="qi" name="img" type="file" accept="image/*">
+  <div style="margin-top:14px"><button class="btn">${q ? '保存する' : '問題を作る'}</button></div></form>
+  ${q && canQ(q) ? `<button class="chip" data-act="delq" data-id="${q.id}" style="width:100%">この問題を削除</button>` : ''}`, q ? 'q/' + q.subject_id : 'q');
 }
 
-function playView(sid) {
-  if (!play || play.sid !== sid) play = { sid, list: shuf(st.qs.filter(q => q.subject_id === sid)), i: 0, score: 0, res: null, pick: [] };
-  const s = st.subjects.find(x => x.id === sid) || {};
+function setupView(key, s, review) {
+  const pool = review ? st.qs.filter(isWrong) : st.qs.filter(q => q.subject_id === +key);
+  if (!pool.length) return shell(`<h1>${esc(s.name)}</h1><p class="empty">${review ? '間違えたままの問題はありません。' : 'まだ問題がありません。'}</p>${review ? '' : '<button class="btn" data-act="newq">問題を作る</button>'}`, 'q');
+  const units = [...new Set(pool.map(q => q.unit).filter(Boolean))];
+  const kinds = [...new Set(pool.map(q => q.kind))];
+  const nW = pool.filter(isWrong).length, nN = pool.filter(q => !lastAtt(q.id)).length;
+  const list = pool.map(q => {
+    const a = lastAtt(q.id), r = rate(q), rp = repsOf(q).length;
+    return `<div class="ql"><div class="qt"><p>${esc(qText(q))}</p><small>${KINDS[q.kind][0]}${q.unit ? ' / ' + esc(q.unit) : ''}${r ? ` / 正答率 ${r.p}%` : ''}${review ? ' / ' + esc(subName(q.subject_id)) : ''}</small>
+      ${rp && canQ(q) ? ` <span class="tag warn">報告${rp}</span>` : ''}</div>
+      <div class="acts" style="flex:none;align-items:center"><span class="mk ${a ? (a.correct ? 'ok' : 'ng') : ''}">${a ? (a.correct ? '○' : '×') : '−'}</span>${canQ(q) ? `<button data-act="editq" data-id="${q.id}">編集</button>` : ''}</div></div>`;
+  }).join('');
+  shell(`<h1>${esc(s.name)}</h1><p class="sub">${pool.length}問${review ? '' : `　間違い${nW}問・未回答${nN}問`}</p>
+  <form id="setupF" class="card"><input type="hidden" name="key" value="${esc(key)}">
+    <label for="sn2">出題数</label><select id="sn2" name="n"><option value="10">10問</option><option value="20">20問</option><option value="all">全部（${pool.length}問）</option></select>
+    ${review ? '' : `<label for="sc">出題範囲</label><select id="sc" name="scope"><option value="">すべての問題</option><option value="wrong" ${nW ? '' : 'disabled'}>間違えた問題だけ（${nW}問）</option><option value="new" ${nN ? '' : 'disabled'}>まだ解いていない問題（${nN}問）</option></select>`}
+    ${units.length ? `<label for="su">単元</label><select id="su" name="unit"><option value="">すべて</option>${units.map(u => `<option>${esc(u)}</option>`).join('')}</select>` : ''}
+    ${kinds.length > 1 ? `<label for="sk">形式</label><select id="sk" name="kind"><option value="">すべて</option>${kinds.map(k => `<option value="${k}">${KINDS[k][0]}</option>`).join('')}</select>` : ''}
+    <div style="margin-top:14px"><button class="btn">スタート</button></div></form>
+  <section class="card2"><h2>問題一覧</h2>${list}</section>
+  <p class="sub">○×は、あなたが最後に解いたときの結果です。正答率はクラス全体の集計です。</p>`, 'q');
+}
+
+function playView(key) {
+  const review = key === 'review';
+  const s = review ? { name: '間違えた問題の復習' } : st.subjects.find(x => x.id === +key);
+  if (!s) { location.hash = '#/q'; return; }
+  if (!play || play.key !== key) return setupView(key, s, review);
   const { list, i } = play;
-  if (!list.length) { play = null; return shell(`<h1>${esc(s.name)}</h1><p class="empty">まだ問題がありません。</p><a class="btn lnk" href="#/qnew">問題を作る</a>`, 'q'); }
   if (i >= list.length) {
-    const sc = play.score; play = null;
-    return shell(`<h1>${esc(s.name)}の結果</h1><section class="card2"><p class="big2">${sc} / ${list.length} 問正解</p></section><a class="btn lnk" href="#/q/${sid}" style="margin-bottom:10px">もう一度</a><a class="btn lnk" href="#/q">問題一覧へ</a>`, 'q');
+    const sc = play.score, miss = play.miss; lastMiss = miss; play = null;
+    return shell(`<h1>${esc(s.name)}の結果</h1><section class="card2"><p class="big2">${sc} / ${list.length} 問正解</p>
+      ${miss.length ? `<h2>間違えた問題</h2>${miss.map(q => `<div class="ql"><div class="qt"><p>${esc(qText(q))}</p><small>正解：${esc(corr(q))}</small></div></div>`).join('')}` : '<p>全問正解！</p>'}</section>
+      ${miss.length ? `<button class="btn" data-act="retrymiss" data-key="${esc(key)}" style="margin-bottom:10px">間違えた${miss.length}問をもう一度</button>` : ''}
+      <a class="btn lnk" href="#/q/${esc(key)}" style="margin-bottom:10px;background:#fff;color:var(--blue)">設定を変えてもう一度</a><a class="btn lnk" href="#/q" style="background:#fff;color:var(--blue)">問題一覧へ</a>`, 'q');
   }
   const q = list[i], ch = q.choices, r = play.res, p = play.pick;
   if (q.kind === 'order' && !play.shuf) play.shuf = shuf(ch);
   if (q.kind === 'match' && !play.rs) play.rs = shuf(ch.map(x => x[1]));
+  if ((q.kind === 'single' || q.kind === 'multi') && !play.perm) play.perm = shuf(ch.map((_, k) => k));
   const ans = JSON.parse(q.answer);
-  const can = q.author_id === me.id || me.is_admin;
-  const head = `<h1>${esc(s.name)}</h1><p class="sub">${i + 1} / ${list.length}問　${KINDS[q.kind][0]}${can ? `　<button class="x" data-act="delq" data-id="${q.id}" style="width:auto">この問題を削除</button>` : ''}</p>${q.image_path ? `<img class="pic" data-path="${esc(q.image_path)}" alt="問題の画像">` : ''}`;
+  const head = `<h1>${esc(review ? subName(q.subject_id) : s.name)}</h1><p class="sub">${i + 1} / ${list.length}問　${KINDS[q.kind][0]}${q.unit ? '　' + esc(q.unit) : ''}${canQ(q) ? `　<button class="x" data-act="editq" data-id="${q.id}" style="width:auto">編集</button>` : ''}</p>${q.image_path ? `<img class="pic" data-path="${esc(q.image_path)}" alt="問題の画像">` : ''}`;
   const chk = r ? '' : '<button class="btn" style="margin-top:12px">答え合わせ</button>';
   let body;
   if (q.kind === 'fill') {
@@ -525,8 +597,9 @@ function playView(sid) {
     body = `<section class="card2 qb">${esc(q.body)}</section>`;
     if (q.kind === 'single' || q.kind === 'multi' || q.kind === 'tf') {
       const opts = q.kind === 'tf' ? ['○', '×'] : ch;
+      const order = q.kind === 'tf' ? [0, 1] : play.perm;
       const isA = k => q.kind === 'tf' ? opts[k] === ans : ans.includes(k);
-      body += `<div class="opts">${opts.map((o, k) => `<button class="opt ${p.includes(k) ? 'on' : ''} ${r ? (isA(k) ? 'ok' : p.includes(k) ? 'ng' : '') : ''}" data-act="pick" data-id="${k}" ${r ? 'disabled' : ''}>${esc(o)}</button>`).join('')}</div>`;
+      body += `<div class="opts">${order.map(k => `<button class="opt ${p.includes(k) ? 'on' : ''} ${r ? (isA(k) ? 'ok' : p.includes(k) ? 'ng' : '') : ''}" data-act="pick" data-id="${k}" ${r ? 'disabled' : ''}>${esc(opts[k])}</button>`).join('')}</div>`;
       if (q.kind === 'multi' && !r) body += '<button class="btn" data-act="check">答え合わせ</button>';
     } else if (q.kind === 'order') {
       body += `<div class="seq">${p.map(k => `<span class="tag">${esc(play.shuf[k])}</span>`).join('') || '<span class="sub">下から正しい順番にタップ</span>'}</div>
@@ -538,7 +611,13 @@ function playView(sid) {
       body += `<form id="ansF"><input name="w" placeholder="答えを入力" aria-label="答え" autocomplete="off" ${r ? 'disabled' : ''}>${chk}</form>`;
     }
   }
-  const res = r ? `<section class="card2 res ${r.ok ? 'ok' : 'ng'}" style="margin-top:14px"><h2>${r.ok ? '正解！' : '不正解'}</h2><p>正解：${esc(corr(q))}</p>${q.explanation ? `<p class="sub">${esc(q.explanation)}</p>` : ''}<button class="btn" data-act="next" style="margin-bottom:12px">${i + 1 < list.length ? '次へ' : '結果を見る'}</button></section>` : '';
+  const rt = rate(q);
+  const res = r ? `<section class="card2 res ${r.ok ? 'ok' : 'ng'}" style="margin-top:14px"><h2>${r.ok ? '正解！' : '不正解'}</h2><p>正解：${esc(corr(q))}</p>
+    ${!r.ok && (q.kind === 'fill' || q.kind === 'word') ? '<button class="chip" data-act="selfok" style="margin-bottom:10px">自分の答えも合っていた（正解にする）</button>' : ''}
+    ${q.explanation ? `<p class="sub">${esc(q.explanation)}</p>` : ''}
+    <p class="sub">${rt ? `クラスの正答率 ${rt.p}%（${rt.n}回）` : 'クラスの正答率：まだ集計がありません'}</p>
+    ${play.repOpen ? `<form id="repF" class="cmf" style="margin-bottom:10px"><input type="hidden" name="qid" value="${q.id}"><input name="body" required placeholder="例：答えが違うかも／別解あり" aria-label="報告の内容"><button class="chip">送る</button></form>` : `<button class="chip" data-act="rep" style="margin-bottom:10px">問題の間違いを報告</button>`}
+    <button class="btn" data-act="next" style="margin-bottom:12px">${i + 1 < list.length ? '次へ' : '結果を見る'}</button></section>` : '';
   shell(head + body + res, 'q');
 }
 
@@ -574,10 +653,32 @@ app.addEventListener('submit', async e => {
     }
     if (f.id === 'addQ') {
       const pq = parseQ(d.kind, d.body, d.data || '');
-      const image_path = await upImg(d.img);
-      const r = await sb.from('questions').insert({ subject_id: +d.sid, tip_id: d.tip ? +d.tip : null, kind: d.kind, body: d.body.trim(), choices: pq.choices, answer: JSON.stringify(pq.answer), explanation: d.exp.trim() || null, image_path });
+      const row = { subject_id: +d.sid, tip_id: d.tip ? +d.tip : null, kind: d.kind, body: d.body.trim(), choices: pq.choices, answer: JSON.stringify(pq.answer), explanation: d.exp.trim() || null, unit: d.unit.trim() || null };
+      const img = await upImg(d.img);
+      if (img) row.image_path = img; else if (d.rmimg) row.image_path = null;
+      const r = d.qid ? await sb.from('questions').update(row).eq('id', +d.qid).select() : await sb.from('questions').insert(row).select();
       if (r.error) throw r.error;
-      qFromTip = null; await load(); location.hash = '#/q'; return;
+      if (!r.data.length) throw new Error('保存できませんでした。自分の問題か確認してください');
+      qFromTip = null; qEditId = null; play = null; await load(); location.hash = '#/q/' + d.sid; toast(d.qid ? '問題を保存しました' : '問題を作りました', true); return;
+    }
+    if (f.id === 'setupF') {
+      const review = d.key === 'review';
+      let pool = review ? st.qs.filter(isWrong) : st.qs.filter(q => q.subject_id === +d.key);
+      if (d.scope === 'wrong') pool = pool.filter(isWrong);
+      if (d.scope === 'new') pool = pool.filter(q => !lastAtt(q.id));
+      if (d.unit) pool = pool.filter(q => q.unit === d.unit);
+      if (d.kind) pool = pool.filter(q => q.kind === d.kind);
+      if (!pool.length) throw new Error('条件に合う問題がありません');
+      pool = shuf(pool); if (d.n !== 'all') pool = pool.slice(0, +d.n);
+      play = { key: d.key, list: pool, i: 0, score: 0, res: null, pick: [], miss: [] };
+      route(); return window.scrollTo(0, 0);
+    }
+    if (f.id === 'repF') {
+      const r = await sb.from('question_reports').insert({ question_id: +d.qid, body: d.body.trim() });
+      if (r.error) throw r.error;
+      play.repOpen = false; toast('報告を送りました。作った人に届きます', true);
+      st.rep.push({ id: 0, question_id: +d.qid, body: d.body.trim(), reporter_id: me.id, created_at: new Date().toISOString(), profiles: { display_name: me.display_name } });
+      return route();
     }
     if (f.id === 'homeSearch') { searchQ = d.q || ''; location.hash = '#/search'; return; }
     if (f.id === 'addSubject') {
@@ -620,7 +721,7 @@ app.addEventListener('click', async e => {
     if (a === 'edit') { editId = id; route(); const e = document.getElementById('et'); if (e) { e.scrollIntoView({ block: 'center' }); e.focus({ preventScroll: true }); } return; }
     if (a === 'cancel') { editId = null; return route(); }
     if (a === 'cm') { openTip = openTip === id ? null : id; return route(); }
-    if (a === 'mkq') { qFromTip = id; location.hash = '#/qnew'; return; }
+    if (a === 'mkq') { qFromTip = id; qEditId = null; location.hash = '#/qnew'; return; }
     if (a === 'pick') {
       const q = play.list[play.i];
       if (q.kind === 'multi') play.pick = play.pick.includes(id) ? play.pick.filter(k => k !== id) : [...play.pick, id];
@@ -628,9 +729,20 @@ app.addEventListener('click', async e => {
       return route();
     }
     if (a === 'check') { judge({}); return route(); }
+    if (a === 'selfok') {
+      if (play.res && !play.res.ok) {
+        play.res.ok = true; play.score++; play.miss = play.miss.filter(x => x !== play.list[play.i]);
+        if (play.attId) { await sb.from('attempts').update({ correct: true }).eq('id', play.attId); const at = st.att.find(x => x.id === play.attId); if (at) at.correct = true; }
+      }
+      return route();
+    }
+    if (a === 'rep') { play.repOpen = true; route(); const e = document.querySelector('#repF input[name=body]'); if (e) e.focus(); return; }
+    if (a === 'newq') { qEditId = null; qFromTip = null; location.hash = '#/qnew'; return; }
+    if (a === 'editq') { qEditId = id; qFromTip = null; if (location.hash === '#/qnew') route(); else location.hash = '#/qnew'; return; }
+    if (a === 'retrymiss') { play = { key: b.dataset.key, list: shuf(lastMiss), i: 0, score: 0, res: null, pick: [], miss: [] }; route(); return window.scrollTo(0, 0); }
     if (a === 'opick') { play.pick.push(id); return route(); }
     if (a === 'oreset') { play.pick = []; return route(); }
-    if (a === 'next') { Object.assign(play, { i: play.i + 1, res: null, pick: [], shuf: null, rs: null }); route(); return window.scrollTo(0, 0); }
+    if (a === 'next') { Object.assign(play, { i: play.i + 1, res: null, pick: [], shuf: null, rs: null, perm: null, repOpen: false, attId: null }); route(); return window.scrollTo(0, 0); }
     if (a === 'unit') { unitF = b.dataset.u; return route(); }
     if (a === 'sort') { sortBy = sortBy === 'conf' ? 'new' : 'conf'; return route(); }
     let r;
@@ -642,7 +754,9 @@ app.addEventListener('click', async e => {
     } else if (a === 'delq') {
       if (!confirm('この問題を削除しますか？')) return;
       r = await sb.from('questions').delete().eq('id', id);
-      play = null;
+      play = null; qEditId = null; if (location.hash === '#/qnew') location.hash = '#/q';
+    } else if (a === 'delrep') {
+      r = await sb.from('question_reports').delete().eq('id', id);
     } else if (a === 'fix') {
       r = await sb.rpc('toggle_correction', { p_tip_id: id });
     } else if (a === 'del') {
