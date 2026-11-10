@@ -249,7 +249,17 @@ function meView() {
   <h2>自分の投稿</h2><section class="card2">${mine.map(item).join('') || '<p class="empty">まだ投稿がありません。</p>'}</section>`);
 }
 
+let editId = null;
+function editForm(t) {
+  const opts = ['先生の発言', '資料', '過去問', 'その他'].map(o => `<option ${o === t.source ? 'selected' : ''}>${o}</option>`).join('');
+  return `<form id="editTip" class="card" style="--ac:${ac(t.subject_id)}"><input type="hidden" name="tid" value="${t.id}">
+    <label for="eb">内容</label><textarea id="eb" name="body" required>${esc(t.body)}</textarea>
+    <label for="es">情報源</label><select id="es" name="source">${opts}</select>
+    <label for="eu">単元（任意）</label><input id="eu" name="unit" value="${esc(t.unit || '')}">
+    <div class="acts" style="margin-top:14px"><button class="btn" style="flex:1">保存する</button><button type="button" data-act="cancel">やめる</button></div></form>`;
+}
 function tipHTML(t) {
+  if (editId === t.id) return editForm(t);
   const n = st.conf.filter(c => c.tip_id === t.id).length;
   const mine = st.conf.some(c => c.tip_id === t.id && c.user_id === me.id);
   const can = t.author_id === me.id || me.is_admin;
@@ -260,7 +270,7 @@ function tipHTML(t) {
     <div class="acts">
       <button class="cf ${mine ? 'on' : ''}" data-act="conf" data-id="${t.id}">${mine ? '確認済み' : '確認した'} ${n}</button>
       <button data-act="fix" data-id="${t.id}">${t.needs_correction ? '訂正を取り消す' : '訂正あり'}</button>
-      ${can ? `<button data-act="del" data-id="${t.id}">削除</button>` : ''}
+      ${can ? `<button data-act="edit" data-id="${t.id}">編集</button><button data-act="del" data-id="${t.id}">削除</button>` : ''}
     </div></article>`;
 }
 
@@ -316,6 +326,12 @@ app.addEventListener('submit', async e => {
   const f = e.target, d = Object.fromEntries(new FormData(f));
   try {
     if (f.id === 'auth') return await doAuth(d);
+    if (f.id === 'editTip') {
+      const r = await sb.from('tips').update({ body: d.body.trim(), source: d.source, unit: d.unit.trim() || null }).eq('id', +d.tid).select();
+      if (r.error) throw r.error;
+      if (!r.data.length) throw new Error('編集できませんでした。自分の投稿か確認してください');
+      editId = null;
+    }
     if (f.id === 'homeSearch') { searchQ = d.q || ''; location.hash = '#/search'; return; }
     if (f.id === 'addSubject') {
       const r = await sb.from('subjects').insert({ name: d.name.trim(), exam_date: d.exam_date || null });
@@ -347,6 +363,8 @@ app.addEventListener('click', async e => {
     if (a === 'mode') { authMode = authMode === 'login' ? 'reg' : 'login'; return route(); }
     if (a === 'out') { await sb.auth.signOut(); me = null; return route(); }
     if (a === 'write') { const t = document.getElementById('tb'); t.scrollIntoView({ behavior: 'smooth', block: 'center' }); return t.focus({ preventScroll: true }); }
+    if (a === 'edit') { editId = id; route(); const e = document.getElementById('eb'); if (e) { e.scrollIntoView({ block: 'center' }); e.focus({ preventScroll: true }); } return; }
+    if (a === 'cancel') { editId = null; return route(); }
     if (a === 'unit') { unitF = b.dataset.u; return route(); }
     if (a === 'sort') { sortBy = sortBy === 'conf' ? 'new' : 'conf'; return route(); }
     let r;
