@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>ヤマはる</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
@@ -16,6 +16,12 @@
 <style>
 :root{--bg:#F4F8FE;--ink:#10264F;--sub:#62728F;--line:#DCE6F5;--card:#fff;--hl:#FFD93B;--blue:#2F7BF5;--teal:#2F7BF5;--navy:#0E2A5C;--red:#D8452B;--sh:0 6px 20px rgba(47,123,245,.10)}
 *{box-sizing:border-box}
+html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+input,select,textarea{font-size:16px!important}
+.pic{cursor:zoom-in}
+#zoom{position:fixed;inset:0;background:rgba(8,18,40,.92);display:none;align-items:center;justify-content:center;z-index:20;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#zoom.on{display:flex}#zoom img{max-width:100%;max-height:100%;object-fit:contain}
+#zoom span{position:absolute;top:calc(12px + env(safe-area-inset-top));right:16px;color:#fff;font-weight:700}
 body{margin:0;background:var(--bg);color:var(--ink);font:500 16px/1.7 "Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif}
 h1,h2{line-height:1.3;margin:0}
 h1{font-size:24px;font-weight:900;margin:8px 0 14px}
@@ -132,6 +138,7 @@ h2+.ql{border-top:0}
 <body>
 <div id="app"></div>
 <div id="toast" role="alert"></div>
+<div id="zoom" role="dialog" aria-label="画像の拡大"><img alt=""><span>タップで閉じる</span></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 // ▼ Supabaseの「Project Settings → API」にある値に書き換えてください
@@ -781,6 +788,18 @@ app.addEventListener('input', e => {
 });
 
 app.addEventListener('change', e => { if (e.target.id === 'qk') document.getElementById('qh').textContent = KINDS[e.target.value][1]; });
+
+// 指が触れたときの拡大・縮小を防ぐ（iPhone対策）
+['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive: false }));
+document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+// 画像はタップで大きく表示
+const zoom = document.getElementById('zoom');
+app.addEventListener('click', e => {
+  const im = e.target.closest('img.pic');
+  if (!im || !im.src) return;
+  zoom.querySelector('img').src = im.src; zoom.classList.add('on');
+});
+zoom.addEventListener('click', () => zoom.classList.remove('on'));
 
 boot();
 </script>
