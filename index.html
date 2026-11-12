@@ -244,6 +244,9 @@ const svg = (n, s = 22) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" 
 const NAV = [['#/', 'home', 'ホーム'], ['#/subjects', 'list', 'テスト一覧'], ['#/write', 'pen', '投稿する'], ['#/q', 'quiz', '問題'], ['#/me', 'user', 'マイページ']];
 const md = d => { const x = new Date(d + 'T00:00:00'); return `${x.getMonth() + 1}/${x.getDate()} (${'日月火水木金土'[x.getDay()]})`; };
 const ago = s => { const m = (Date.now() - new Date(s)) / 6e4; return m < 60 ? `${Math.max(1, Math.round(m))}分前` : m < 1440 ? `${Math.round(m / 60)}時間前` : `${Math.round(m / 1440)}日前`; };
+const live = () => st.subjects.filter(x => !x.archived);
+const archivedIds = () => new Set(st.subjects.filter(x => x.archived).map(x => x.id));
+const liveQ = q => !archivedIds().has(q.subject_id);
 const subName = id => (st.subjects.find(s => s.id === id) || {}).name || '';
 const cnt = t => st.conf.filter(c => c.tip_id === t.id).length;
 function item(t) {
@@ -280,7 +283,7 @@ function authView() {
 }
 
 function homeView() {
-  const subs = st.subjects.map(s => ({ ...s, d: daysLeft(s.exam_date) }));
+  const subs = live().map(s => ({ ...s, d: daysLeft(s.exam_date) }));
   const up = subs.filter(s => s.d !== null && s.d >= 0).sort((a, b) => a.d - b.d || byPer(a, b));
   const days = [];
   up.forEach(s => { const g = days.find(x => x.date === s.exam_date); g ? g.list.push(s) : days.push({ date: s.exam_date, d: s.d, list: [s] }); });
@@ -291,18 +294,20 @@ function homeView() {
       ${days[1] ? `<div class="more">次は ${md(days[1].date)}（あと${days[1].d}日）${days[1].list.map(s => per(s) + esc(s.name)).join('・')}</div>` : ''}</div>${svg('cal', 110)}</div>`
     : `<a class="hero" href="#/subjects"><div><div class="nm">まず科目と試験日を登録しよう</div><span class="pill">科目を追加 ›</span></div>${svg('cal', 110)}</a>`;
   const tile = (h, i, t, c) => `<a href="${h}" class="${c || ''}">${svg(i, 26)}<span>${t}</span></a>`;
-  const pop = st.subjects.map(s => ({ s, n: st.tips.filter(t => t.subject_id === s.id).length })).sort((a, b) => b.n - a.n).slice(0, 3);
+  const pop = live().map(s => ({ s, n: st.tips.filter(t => t.subject_id === s.id).length })).sort((a, b) => b.n - a.n).slice(0, 3);
   shell(`<form id="homeSearch" class="sbar">${svg('search', 20)}<input name="q" placeholder="キーワードで検索…" aria-label="検索"></form>
   ${hero}
   <div class="tiles">${tile('#/write', 'pen', '投稿する')}${tile('#/subjects', 'list', 'テスト一覧')}${tile('#/search', 'search', '検索する')}${tile('#/fav', 'star', 'お気に入り', 'y')}</div>
-  <div class="cols"><section class="card2"><h2>最新の投稿</h2>${st.tips.slice(0, 4).map(item).join('') || '<p class="empty">まだ投稿がありません。「投稿する」から最初の1件を書いてみましょう。</p>'}</section>
+  <div class="cols"><section class="card2"><h2>最新の投稿</h2>${st.tips.filter(t => !archivedIds().has(t.subject_id)).slice(0, 4).map(item).join('') || '<p class="empty">まだ投稿がありません。「投稿する」から最初の1件を書いてみましょう。</p>'}</section>
   <div><section class="card2"><h2>今後のテスト</h2>${days.slice(0, 4).map(g => `<div class="dg"><span class="dt">${md(g.date)}<small>${g.d === 0 ? '今日' : `あと${g.d}日`}</small></span><span class="cs">${g.list.map(s => `<a class="chipc" href="#/s/${s.id}" style="--ac:${ac(s.id)}">${per(s)}${esc(s.name)}</a>`).join('')}</span></div>`).join('') || '<p class="empty">試験日がまだありません。</p>'}${days.length > 4 ? '<a class="up" href="#/subjects" style="justify-content:center;color:var(--blue)">すべて見る ›</a>' : ''}</section>
   <section class="card2"><h2>人気の科目</h2>${pop.map((p, k) => `<a class="up" href="#/s/${p.s.id}"><span>${k + 1}　${esc(p.s.name)}</span><span class="sub">${p.n}件</span></a>`).join('') || '<p class="empty">科目がまだありません。</p>'}</section></div></div>`);
 }
 
 function subjectsView() {
   const key = s => s.d === null ? 1e6 : s.d < 0 ? 5e5 - s.d : s.d;
-  const subs = st.subjects.map(s => ({ ...s, d: daysLeft(s.exam_date) })).sort((a, b) => key(a) - key(b) || byPer(a, b));
+  const arc = st.subjects.filter(x => x.archived).sort((a, b) => (b.exam_date || '').localeCompare(a.exam_date || ''));
+  const subs = live().map(s => ({ ...s, d: daysLeft(s.exam_date) })).sort((a, b) => key(a) - key(b) || byPer(a, b));
+  const pastMine = subs.filter(x => x.d !== null && x.d < 0 && (x.created_by === me.id || me.is_admin));
   const lab = s => s.d === null ? '試験日未設定' : s.d < 0 ? '終了' : s.d === 0 ? '今日' : `あと${s.d}日`;
   const groups = [];
   subs.forEach(s => {
@@ -311,10 +316,11 @@ function subjectsView() {
     g ? g.list.push(s) : groups.push({ k, s, list: [s] });
   });
   const head = g => g.k === 'none' ? '<div class="gh off"><span>試験日未設定</span><span></span></div>'
-    : g.k === 'past' ? '<div class="gh off"><span>終了した試験</span><span></span></div>'
+    : g.k === 'past' ? `<div class="gh off"><span>終了した試験</span><span>${pastMine.length ? `<button class="chip" data-act="arcall">まとめてアーカイブ</button>` : ''}</span></div>`
     : `<div class="gh"><span>${md(g.s.exam_date)}${g.list.length > 1 ? `　${g.list.length}科目` : ''}</span><span>${lab(g.s)}</span></div>`;
   const row = s => `<a class="row" style="--ac:${ac(s.id)}" href="#/s/${s.id}"><span>${s.exam_period && s.d !== null && s.d >= 0 ? `<span class="tag">${s.exam_period}限</span>` : ''}${esc(s.name)}</span><span class="d off">${s.d !== null && s.d < 0 ? md(s.exam_date) : '›'}</span></a>`;
-  shell(`<h1>テスト一覧</h1>${groups.map(g => head(g) + g.list.map(row).join('')).join('')}
+  shell(`<h1>テスト一覧</h1>${groups.map(g => head(g) + g.list.map(row).join('')).join('') || (arc.length ? '<p class="empty">進行中の科目はありません。</p>' : '')}
+  ${arc.length ? `<details><summary>アーカイブした科目（${arc.length}）</summary>${arc.map(x => `<a class="row" style="--ac:${ac(x.id)}" href="#/s/${x.id}"><span>${esc(x.name)}</span><span class="d off">${x.exam_date ? md(x.exam_date) : ''}</span></a>`).join('')}</details>` : ''}
   <details ${subs.length ? '' : 'open'}><summary>科目を追加する</summary><form id="addSubject"><label for="sn">科目名</label><input id="sn" name="name" required>
   <label for="sd">試験日（あとから変更できます）</label><input id="sd" name="exam_date" type="date"><label for="sp">時限（任意）</label><select id="sp" name="exam_period">${perOpts("")}</select><div style="margin-top:14px"><button class="btn">追加する</button></div></form></details>`);
 }
@@ -322,7 +328,7 @@ function subjectsView() {
 let writeSid = null;
 function writeView() {
   if (!st.subjects.length) return shell('<h1>投稿する</h1><p class="empty">先に「テスト一覧」で科目を追加してください。</p>');
-  const sel = st.subjects.map(s => `<option value="${s.id}" ${s.id === writeSid ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
+  const sel = st.subjects.filter(s => !s.archived || s.id === writeSid).map(s => `<option value="${s.id}" ${s.id === writeSid ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
   const opts = ['先生の発言', '資料', '過去問', 'その他'].map(o => `<option ${o === lastSource ? 'selected' : ''}>${o}</option>`).join('');
   const units = [...new Set(st.tips.map(t => t.unit).filter(Boolean))];
   shell(`<h1>投稿する</h1><form id="addTip" class="card"><label for="ws">科目</label><select id="ws" name="sid">${sel}</select>
@@ -387,6 +393,7 @@ function subjectView(id) {
   if (!s) { location.hash = '#/'; return; }
   const tips = st.tips.filter(t => t.subject_id === id);
   const canDel = me.is_admin || (s.created_by === me.id && !tips.length);
+  const canArc = me.is_admin || s.created_by === me.id;
   const units = [...new Set(tips.map(t => t.unit).filter(Boolean))];
   const cnt = t => st.conf.filter(c => c.tip_id === t.id).length;
   let list = unitF ? tips.filter(t => t.unit === unitF) : tips.slice();
@@ -394,10 +401,10 @@ function subjectView(id) {
   const d = daysLeft(s.exam_date);
   const dl = d === null ? '試験日未設定' : d < 0 ? '試験は終了しました' : d === 0 ? '試験は今日です' : `試験まであと${d}日`;
   const dlp = d !== null && d >= 0 && s.exam_period ? `（${s.exam_period}限）` : '';
-  shell(`<h1>${esc(s.name)}</h1><p class="sub">${dl}${dlp}</p>
+  shell(`<h1>${esc(s.name)}</h1>${s.archived ? '<p class="tag warn" style="display:inline-block">アーカイブ済み：ホームや一覧には表示されません</p>' : ''}<p class="sub">${dl}${dlp}</p>
   <label for="examDate">試験日</label><input id="examDate" type="date" value="${s.exam_date || ''}" data-sid="${s.id}">
   <label for="examPer">時限</label><select id="examPer" data-sid="${s.id}">${perOpts(s.exam_period)}</select>
-  ${canDel ? `<div style="margin-top:10px"><button class="chip" data-act="delsub" data-id="${s.id}">この科目を削除</button></div>` : ''}
+  ${canArc || canDel ? `<div class="acts" style="margin-top:10px">${canArc ? `<button class="chip" data-act="arc" data-id="${s.id}">${s.archived ? 'アーカイブから戻す' : 'アーカイブする'}</button>` : ''}${canDel ? `<button class="chip" data-act="delsub" data-id="${s.id}">この科目を削除</button>` : ''}</div>` : ''}
   <button class="btn" data-act="towrite" data-id="${s.id}" style="margin-top:16px">＋ この科目のでるところを書く</button>
   <h2>みんなのでるとこ</h2>
   <div class="chips">
@@ -477,11 +484,12 @@ function parseQ(kind, body, data) {
   if (!L.length) err('正解の単語を書いてください');
   return { choices: null, answer: L };
 }
+const anyOrder = q => q.kind === 'fill' && !!(q.choices && q.choices.anyOrder);
 const corr = q => {
   const a = JSON.parse(q.answer);
   return q.kind === 'single' || q.kind === 'multi' ? a.map(k => q.choices[k]).join('、')
     : q.kind === 'tf' ? a : q.kind === 'order' ? a.join(' → ')
-    : q.kind === 'match' ? a.map(p => p.join('＝')).join('、') : q.kind === 'word' ? a.flatMap(alts).join(' / ') : a.map(x => alts(x).join(' / ')).join('、');
+    : q.kind === 'match' ? a.map(p => p.join('＝')).join('、') : q.kind === 'word' ? a.flatMap(alts).join(' / ') : a.map(x => alts(x).join(' / ')).join('、') + (anyOrder(q) ? '（順不同）' : '');
 };
 function judge(vals) {
   const q = play.list[play.i], ans = JSON.parse(q.answer), p = play.pick;
@@ -489,7 +497,15 @@ function judge(vals) {
   if (q.kind === 'single' || q.kind === 'multi') ok = p.length === ans.length && p.every(k => ans.includes(k));
   else if (q.kind === 'tf') ok = ['○', '×'][p[0]] === ans;
   else if (q.kind === 'order') ok = p.length === ans.length && p.every((k, j) => play.shuf[k] === ans[j]);
-  else if (q.kind === 'fill') ok = ans.every((a, j) => alts(a).some(x => nz(vals['b' + j]) === nz(x)));
+  else if (q.kind === 'fill') {
+    const hit = (a, v) => alts(a).some(x => nz(v) === nz(x));
+    if (!anyOrder(q)) ok = ans.every((a, j) => hit(a, vals['b' + j]));
+    else {
+      const inp = ans.map((_, j) => vals['b' + j]), used = [];
+      const go = j => j === inp.length || ans.some((a, k) => !used[k] && hit(a, inp[j]) && (used[k] = true, go(j + 1) || (used[k] = false)));
+      ok = go(0);
+    }
+  }
   else if (q.kind === 'word') ok = ans.flatMap(alts).some(a => nz(a) === nz(vals.w));
   else ok = ans.every(([, rr], j) => vals['m' + j] === rr);
   play.res = { ok }; if (ok) play.score++; else play.miss.push(q);
@@ -509,14 +525,17 @@ const qText = q => q.body.replace(/[［\[]([^］\]]+)[］\]]/g, '（　）');
 
 let qEditId = null, lastMiss = [];
 function qView() {
-  const wrong = st.qs.filter(isWrong);
-  const rows = st.subjects.map(s => {
+  const wrong = st.qs.filter(q => liveQ(q) && isWrong(q));
+  const arc = st.subjects.filter(x => x.archived);
+  const qrow = s => {
     const qs = st.qs.filter(q => q.subject_id === s.id), w = qs.filter(isWrong).length;
     return `<a class="row" style="--ac:${ac(s.id)}" href="#/q/${s.id}"><span>${esc(s.name)}${w ? ` <span class="tag red">間違い${w}</span>` : ''}</span><span class="d ${qs.length ? '' : 'off'}">${qs.length}問 ›</span></a>`;
-  }).join('');
+  };
+  const rows = live().map(qrow).join('');
   shell(`<h1>問題</h1><button class="btn" data-act="newq" style="margin-bottom:14px">＋ 問題を作る</button>
   ${wrong.length ? `<a class="row" href="#/q/review" style="--ac:var(--red)"><span><b>間違えた問題を復習</b><br><small class="sub">全科目から、間違えたままの問題だけ</small></span><span class="d" style="color:var(--red)">${wrong.length}問 ›</span></a>` : ''}
-  ${rows || '<p class="empty">先に「テスト一覧」で科目を追加してください。</p>'}`);
+  ${rows || '<p class="empty">先に「テスト一覧」で科目を追加してください。</p>'}
+  ${arc.length ? `<details style="margin-top:12px"><summary>アーカイブした科目の問題（${arc.length}科目）</summary>${arc.map(qrow).join('')}</details>` : ''}`);
 }
 
 function dataOf(q) {
@@ -535,7 +554,7 @@ function qNewView() {
   const t = !q && st.tips.find(x => x.id === qFromTip);
   const sid = q ? q.subject_id : t ? t.subject_id : null;
   const kind = q ? q.kind : 'single';
-  const sel = st.subjects.map(s => `<option value="${s.id}" ${s.id === sid ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
+  const sel = st.subjects.filter(s => !s.archived || s.id === sid).map(s => `<option value="${s.id}" ${s.id === sid ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
   const units = [...new Set(st.qs.map(x => x.unit).concat(st.tips.map(x => x.unit)).filter(Boolean))];
   const reps = q ? repsOf(q) : [];
   shell(`<h1>${q ? '問題を編集' : '問題を作る'}</h1>${t ? `<p class="sub">元のでるとこ：${esc(t.title || t.body)}</p>` : ''}
@@ -545,6 +564,7 @@ function qNewView() {
   <label for="qk">形式</label><select id="qk" name="kind">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}" ${k === kind ? 'selected' : ''}>${v[0]}</option>`).join('')}</select>
   <label for="qb">問題文</label><textarea id="qb" name="body" required>${q ? esc(q.body) : t ? esc([t.title, t.body].filter(Boolean).join('\n')) : ''}</textarea>
   <label for="qd">答え・選択肢</label><p class="sub" id="qh" style="margin:0 0 4px">${KINDS[kind][1]}</p><textarea id="qd" name="data">${q ? esc(dataOf(q)) : ''}</textarea>
+  <label id="aoBox" style="display:${kind === 'fill' ? 'flex' : 'none'};gap:8px;align-items:center;font-weight:700"><input type="checkbox" name="anyorder" style="width:auto;min-height:0" ${q && anyOrder(q) ? 'checked' : ''}> 空欄の答えは順不同（どの順で書いても正解）</label>
   <label for="qe">解説（任意）</label><textarea id="qe" name="exp">${q ? esc(q.explanation || '') : ''}</textarea>
   <label for="qu">単元（任意）</label><input id="qu" name="unit" list="qul" value="${esc(q ? q.unit || '' : t ? t.unit || '' : '')}" placeholder="例：骨盤"><datalist id="qul">${units.map(u => `<option value="${esc(u)}">`).join('')}</datalist>
   ${q && q.image_path ? `<img class="pic" data-path="${esc(q.image_path)}" alt="今の画像"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="rmimg" style="width:auto;min-height:0"> 画像を消す</label>` : ''}
@@ -554,7 +574,7 @@ function qNewView() {
 }
 
 function setupView(key, s, review) {
-  const pool = review ? st.qs.filter(isWrong) : st.qs.filter(q => q.subject_id === +key);
+  const pool = review ? st.qs.filter(q => liveQ(q) && isWrong(q)) : st.qs.filter(q => q.subject_id === +key);
   if (!pool.length) return shell(`<h1>${esc(s.name)}</h1><p class="empty">${review ? '間違えたままの問題はありません。' : 'まだ問題がありません。'}</p>${review ? '' : '<button class="btn" data-act="newq">問題を作る</button>'}`, 'q');
   const units = [...new Set(pool.map(q => q.unit).filter(Boolean))];
   const kinds = [...new Set(pool.map(q => q.kind))];
@@ -594,7 +614,7 @@ function playView(key) {
   if (q.kind === 'match' && !play.rs) play.rs = shuf(ch.map(x => x[1]));
   if ((q.kind === 'single' || q.kind === 'multi') && !play.perm) play.perm = shuf(ch.map((_, k) => k));
   const ans = JSON.parse(q.answer);
-  const head = `<h1>${esc(review ? subName(q.subject_id) : s.name)}</h1><p class="sub">${i + 1} / ${list.length}問　${KINDS[q.kind][0]}${q.unit ? '　' + esc(q.unit) : ''}${canQ(q) ? `　<button class="x" data-act="editq" data-id="${q.id}" style="width:auto">編集</button>` : ''}</p>${q.image_path ? `<img class="pic" data-path="${esc(q.image_path)}" alt="問題の画像">` : ''}`;
+  const head = `<h1>${esc(review ? subName(q.subject_id) : s.name)}</h1><p class="sub">${i + 1} / ${list.length}問　${KINDS[q.kind][0]}${anyOrder(q) ? '（順不同）' : ''}${q.unit ? '　' + esc(q.unit) : ''}${canQ(q) ? `　<button class="x" data-act="editq" data-id="${q.id}" style="width:auto">編集</button>` : ''}</p>${q.image_path ? `<img class="pic" data-path="${esc(q.image_path)}" alt="問題の画像">` : ''}`;
   const chk = r ? '' : '<button class="btn" style="margin-top:12px">答え合わせ</button>';
   let body;
   if (q.kind === 'fill') {
@@ -660,6 +680,7 @@ app.addEventListener('submit', async e => {
     }
     if (f.id === 'addQ') {
       const pq = parseQ(d.kind, d.body, d.data || '');
+      if (d.kind === 'fill' && d.anyorder) pq.choices = { anyOrder: true };
       const row = { subject_id: +d.sid, tip_id: d.tip ? +d.tip : null, kind: d.kind, body: d.body.trim(), choices: pq.choices, answer: JSON.stringify(pq.answer), explanation: d.exp.trim() || null, unit: d.unit.trim() || null };
       const img = await upImg(d.img);
       if (img) row.image_path = img; else if (d.rmimg) row.image_path = null;
@@ -670,7 +691,7 @@ app.addEventListener('submit', async e => {
     }
     if (f.id === 'setupF') {
       const review = d.key === 'review';
-      let pool = review ? st.qs.filter(isWrong) : st.qs.filter(q => q.subject_id === +d.key);
+      let pool = review ? st.qs.filter(q => liveQ(q) && isWrong(q)) : st.qs.filter(q => q.subject_id === +d.key);
       if (d.scope === 'wrong') pool = pool.filter(isWrong);
       if (d.scope === 'new') pool = pool.filter(q => !lastAtt(q.id));
       if (d.unit) pool = pool.filter(q => q.unit === d.unit);
@@ -769,6 +790,16 @@ app.addEventListener('click', async e => {
     } else if (a === 'del') {
       if (!confirm('この投稿を削除しますか？')) return;
       r = await sb.from('tips').delete().eq('id', id);
+    } else if (a === 'arc') {
+      const sub = st.subjects.find(x => x.id === id);
+      r = await sb.from('subjects').update({ archived: !sub.archived }).eq('id', id).select();
+      if (!r.error && !r.data.length) throw new Error('変更できませんでした。科目を作った人か管理者だけが変更できます');
+      if (!r.error) toast(sub.archived ? 'アーカイブから戻しました' : 'アーカイブしました', true);
+    } else if (a === 'arcall') {
+      const ids = st.subjects.filter(x => !x.archived && x.exam_date && daysLeft(x.exam_date) < 0 && (x.created_by === me.id || me.is_admin)).map(x => x.id);
+      if (!confirm(`終了した${ids.length}科目をアーカイブしますか？（あとから戻せます）`)) return;
+      r = await sb.from('subjects').update({ archived: true }).in('id', ids);
+      if (!r.error) toast(`${ids.length}科目をアーカイブしました`, true);
     } else if (a === 'delsub') {
       const n = st.tips.filter(t => t.subject_id === id).length;
       if (!confirm(n ? `この科目と、中の投稿${n}件をすべて削除しますか？元に戻せません。` : 'この科目を削除しますか？')) return;
@@ -787,7 +818,7 @@ app.addEventListener('input', e => {
   const el = document.getElementById('res'); if (el) el.innerHTML = searchResults();
 });
 
-app.addEventListener('change', e => { if (e.target.id === 'qk') document.getElementById('qh').textContent = KINDS[e.target.value][1]; });
+app.addEventListener('change', e => { if (e.target.id === 'qk') { document.getElementById('qh').textContent = KINDS[e.target.value][1]; document.getElementById('aoBox').style.display = e.target.value === 'fill' ? 'flex' : 'none'; } });
 
 // 指が触れたときの拡大・縮小を防ぐ（iPhone対策）
 ['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive: false }));
